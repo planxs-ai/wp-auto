@@ -179,9 +179,8 @@ const POLISH_MODELS = [
 
 const TABS = [
   { id: 'dash', label: '대시보드', icon: '◎' },
-  { id: 'quick', label: '빠른 발행', icon: '▶' },
   { id: 'logs', label: '발행 로그', icon: '⊞' },
-  { id: 'niche', label: '니치 선택', icon: '◉' },
+  { id: 'niche', label: '니치/발행', icon: '◉' },
   { id: 'schedule', label: '스케줄', icon: '◷' },
   { id: 'money', label: '수익화', icon: '↗' },
   { id: 'api', label: 'API/연동', icon: '⊞' },
@@ -553,7 +552,6 @@ export default function Dashboard() {
 
       <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 24px 60px' }}>
         {tab === 'dash' && <DashTab {...sharedProps} />}
-        {tab === 'quick' && <QuickPublishTab siteId={selectedSite} />}
         {tab === 'logs' && <PostsTab siteId={selectedSite} />}
         {tab === 'niche' && <NicheTab {...sharedProps} />}
         {tab === 'schedule' && <ScheduleTab {...sharedProps} />}
@@ -711,7 +709,36 @@ function DashTab({ siteId, selNiches, connectedAff, connectedApi, adPct, selDays
 // TAB 2: NICHE
 // ═══════════════════════════════════════════
 
-function NicheTab({ selNiches, toggleNiche }) {
+function NicheTab({ selNiches, toggleNiche, siteId }) {
+  const [count, setCount] = useState(1);
+  const [dryRun, setDryRun] = useState(false);
+  const [pubStatus, setPubStatus] = useState('idle');
+  const [pubMsg, setPubMsg] = useState('');
+  const { posts, loading: postsLoading } = useRecentPosts(siteId, 5);
+
+  const handlePublish = async () => {
+    setPubStatus('loading');
+    setPubMsg('');
+    try {
+      const nicheParam = selNiches.length === 1 ? selNiches[0] : '';
+      const resp = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count, pipeline: 'autoblog', dry_run: dryRun, niche: nicheParam }),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        setPubStatus('success');
+        setPubMsg(`${dryRun ? '[테스트] ' : ''}발행 요청 완료! GitHub Actions에서 ${count}편 처리 중...`);
+      } else {
+        setPubStatus('error');
+        setPubMsg(data.error || '요청 실패');
+      }
+    } catch (err) {
+      setPubStatus('error');
+      setPubMsg('네트워크 오류: ' + err.message);
+    }
+  };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
@@ -787,6 +814,106 @@ function NicheTab({ selNiches, toggleNiche }) {
           </div>
         </Card>
       )}
+
+      {/* ── 발행 섹션 ── */}
+      <Card>
+        <SectionTitle>발행</SectionTitle>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: 500 }}>발행 편수</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[1, 3, 5, 10].map(n => (
+                <button key={n} onClick={() => setCount(n)} style={{
+                  padding: '10px 20px', borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                  border: count === n ? '2px solid #6366f1' : '2px solid #e2e8f0',
+                  background: count === n ? 'rgba(99,102,241,0.06)' : '#fff',
+                  color: count === n ? '#6366f1' : '#64748b',
+                  transition: 'all 0.15s',
+                }}>{n}편</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px', borderRadius: 10, background: '#f8fafc'
+          }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>테스트 모드</span>
+              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>실제 발행 없이 엔진만 실행</span>
+            </div>
+            <button onClick={() => setDryRun(!dryRun)} style={{
+              width: 48, height: 26, borderRadius: 13, border: 'none',
+              background: dryRun ? '#6366f1' : '#e2e8f0',
+              cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
+            }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: '50%', background: '#fff',
+                position: 'absolute', top: 3, left: dryRun ? 25 : 3,
+                transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={handlePublish} disabled={pubStatus === 'loading' || selNiches.length === 0} style={{
+              flex: 1, padding: '14px 24px', borderRadius: 12, border: 'none', cursor: pubStatus === 'loading' || selNiches.length === 0 ? 'not-allowed' : 'pointer',
+              background: selNiches.length === 0 ? '#e2e8f0' : dryRun ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #6366f1, #818cf8)',
+              color: selNiches.length === 0 ? '#94a3b8' : '#fff',
+              fontSize: 15, fontWeight: 700, transition: 'opacity 0.15s',
+              opacity: pubStatus === 'loading' ? 0.7 : 1,
+              boxShadow: selNiches.length > 0 ? '0 4px 12px rgba(99,102,241,0.3)' : 'none',
+            }}>
+              {selNiches.length === 0 ? '니치를 먼저 선택하세요'
+                : pubStatus === 'loading' ? '요청 전송 중...'
+                : dryRun ? `테스트 발행 (${count}편)` : `발행하기 (${count}편)`}
+            </button>
+          </div>
+
+          {pubMsg && (
+            <div style={{
+              padding: '12px 16px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+              background: pubStatus === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+              color: pubStatus === 'success' ? '#059669' : '#dc2626',
+            }}>{pubMsg}</div>
+          )}
+
+          {selNiches.length > 0 && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: '#f8fafc', fontSize: 12, color: '#94a3b8', lineHeight: 1.7 }}>
+              선택된 니치({selNiches.length}개)에서 자동 키워드 생성 후 발행합니다.
+              진행 상황은 발행 로그 탭에서 실시간 확인 가능.
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* ── 최근 발행 ── */}
+      <Card>
+        <SectionTitle>최근 발행</SectionTitle>
+        {postsLoading ? <LoadingState /> : posts.length === 0 ? (
+          <EmptyState text="아직 발행된 글이 없습니다" small />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {posts.map(p => (
+              <div key={p.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 14px', borderRadius: 10, background: '#f8fafc'
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 500, color: '#1a1a2e',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                  }}>{p.title}</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                    {p.keyword} · {new Date(p.published_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                  </div>
+                </div>
+                <Badge text={p.status === 'published' ? '발행' : '실패'} color={p.status === 'published' ? 'green' : 'red'} />
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
@@ -1806,238 +1933,6 @@ function PostsTab({ siteId }) {
 // ═══════════════════════════════════════════
 // QUICK PUBLISH TAB
 // ═══════════════════════════════════════════
-
-const NICHES = [
-  { id: 'all', label: '전체 (자동 선택)', color: '#6366f1' },
-  { id: '재테크', label: '재테크', color: '#1a73e8' },
-  { id: '투자', label: '투자', color: '#0d9488' },
-  { id: '대출', label: '대출', color: '#d97706' },
-  { id: '보험', label: '보험', color: '#dc2626' },
-  { id: '절세', label: '절세', color: '#7c3aed' },
-  { id: '카드', label: '카드', color: '#2563eb' },
-  { id: '생활', label: '생활', color: '#059669' },
-  { id: '가전', label: '가전/전자', color: '#475569' },
-  { id: '부동산', label: '부동산', color: '#b45309' },
-  { id: '정부지원', label: '정부지원', color: '#0891b2' },
-  { id: '부업', label: '부업', color: '#be185d' },
-];
-
-function QuickPublishTab({ siteId }) {
-  const [niche, setNiche] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('autoblog_niche') || 'all';
-    }
-    return 'all';
-  });
-  const [count, setCount] = useState(1);
-  const [dryRun, setDryRun] = useState(false);
-  const [status, setStatus] = useState('idle');
-  const [message, setMessage] = useState('');
-  const { posts, loading: postsLoading } = useRecentPosts(siteId, 5);
-
-  const selectNiche = (id) => {
-    setNiche(id);
-    localStorage.setItem('autoblog_niche', id);
-  };
-
-  const handlePublish = async () => {
-    setStatus('loading');
-    setMessage('');
-
-    try {
-      const resp = await fetch('/api/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          count,
-          pipeline: 'autoblog',
-          dry_run: dryRun,
-          niche: niche === 'all' ? '' : niche,
-        }),
-      });
-
-      const data = await resp.json();
-
-      if (resp.ok) {
-        setStatus('success');
-        setMessage(`${dryRun ? '[테스트] ' : ''}발행 요청 완료! GitHub Actions에서 ${count}편 처리 중...`);
-      } else {
-        setStatus('error');
-        setMessage(data.error || '요청 실패');
-      }
-    } catch (err) {
-      setStatus('error');
-      setMessage('네트워크 오류: ' + err.message);
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 640 }}>
-      {/* 니치 선택 */}
-      <Card>
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', marginBottom: 12 }}>니치 선택</div>
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-          gap: 10
-        }}>
-          {NICHES.map(n => (
-            <button
-              key={n.id}
-              onClick={() => selectNiche(n.id)}
-              style={{
-                padding: '12px 16px',
-                borderRadius: 12,
-                border: niche === n.id ? `2px solid ${n.color}` : '2px solid #e2e8f0',
-                background: niche === n.id ? `${n.color}10` : '#fff',
-                color: niche === n.id ? n.color : '#64748b',
-                fontSize: 13,
-                fontWeight: niche === n.id ? 700 : 500,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {n.label}
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      {/* 발행 설정 */}
-      <Card>
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', marginBottom: 12 }}>발행 설정</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* 편수 */}
-          <div>
-            <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 8, fontWeight: 500 }}>
-              발행 편수
-            </label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[1, 3, 5].map(n => (
-                <button
-                  key={n}
-                  onClick={() => setCount(n)}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: 10,
-                    border: count === n ? '2px solid #6366f1' : '2px solid #e2e8f0',
-                    background: count === n ? '#6366f108' : '#fff',
-                    color: count === n ? '#6366f1' : '#64748b',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {n}편
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 드라이런 토글 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px', borderRadius: 10, background: '#f8fafc'
-          }}>
-            <div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>테스트 모드</span>
-              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>
-                실제 발행 없이 엔진만 실행
-              </span>
-            </div>
-            <Toggle on={dryRun} set={() => setDryRun(!dryRun)} />
-          </div>
-
-          {/* 발행 버튼 */}
-          <button
-            onClick={handlePublish}
-            disabled={status === 'loading'}
-            style={{
-              padding: '16px 24px',
-              borderRadius: 14,
-              border: 'none',
-              background: status === 'loading'
-                ? '#94a3b8'
-                : dryRun
-                  ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                  : 'linear-gradient(135deg, #6366f1, #4285f4)',
-              color: '#fff',
-              fontSize: 16,
-              fontWeight: 700,
-              cursor: status === 'loading' ? 'not-allowed' : 'pointer',
-              transition: 'opacity 0.15s',
-              opacity: status === 'loading' ? 0.7 : 1,
-              boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
-            }}
-          >
-            {status === 'loading'
-              ? '요청 전송 중...'
-              : dryRun
-                ? `테스트 발행 (${count}편)`
-                : `발행하기 (${count}편)`
-            }
-          </button>
-
-          {/* 상태 메시지 */}
-          {message && (
-            <div style={{
-              padding: '14px 18px',
-              borderRadius: 10,
-              background: status === 'success' ? '#f0fdf4' : '#fef2f2',
-              color: status === 'success' ? '#10b981' : '#ef4444',
-              fontSize: 13,
-              fontWeight: 500,
-            }}>
-              {message}
-            </div>
-          )}
-
-          {/* 안내 */}
-          <div style={{
-            padding: '12px 16px', borderRadius: 10,
-            background: '#f8fafc', fontSize: 12, color: '#94a3b8', lineHeight: 1.7
-          }}>
-            발행 요청은 GitHub Actions를 통해 실행됩니다.
-            진행 상황은 발행 로그 탭에서 실시간으로 확인할 수 있어요.
-          </div>
-        </div>
-      </Card>
-
-      {/* 최근 발행 미리보기 */}
-      <Card>
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', marginBottom: 12 }}>최근 발행</div>
-        {postsLoading ? <LoadingState /> : posts.length === 0 ? (
-          <EmptyState text="아직 발행된 글이 없습니다" />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {posts.map(p => (
-              <div key={p.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '10px 14px', borderRadius: 10, background: '#f8fafc'
-              }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 13, fontWeight: 500, color: '#1a1a2e',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                  }}>
-                    {p.title}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                    {p.keyword} · {new Date(p.published_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
-                  </div>
-                </div>
-                <Badge
-                  text={p.status === 'published' ? '발행' : '실패'}
-                  color={p.status === 'published' ? 'green' : 'red'}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════
 // SETUP GUIDE

@@ -2120,13 +2120,13 @@ def run_all_sites(count=5, dry_run=False, pipeline="autoblog", adsense_mode=Fals
 
     for site in sites:
         cfg = site.get("config") or {}
-        wp_url = site.get("wp_url", "")
-        wp_user = cfg.get("wp_username", "")
-        wp_pass = cfg.get("wp_app_password", "")
+        wp_url = site.get("wp_url", "") or WP_URL
+        wp_user = cfg.get("wp_username", "") or WP_USER
+        wp_pass = cfg.get("wp_app_password", "") or WP_PASS
 
         if not wp_url or not wp_user or not wp_pass:
             log.warning(f"[{site['id']}] WP 인증정보 미설정 — 스킵")
-            log.warning(f"  대시보드 설정 탭에서 WP URL/인증정보를 입력하세요")
+            log.warning(f"  대시보드 설정 탭에서 WP URL/인증정보를 입력하거나 환경변수를 설정하세요")
             continue
 
         log.info(f"\n{'#'*60}")
