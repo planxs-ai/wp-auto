@@ -1112,7 +1112,11 @@ class AdSenseOptimizer:
 class WordPressPublisher:
     def __init__(self):
         import base64
-        self.url = WP_URL.rstrip("/")
+        # wp_url에서 /wp-json/wp/v2 접미사 제거 (중복 방지)
+        url = WP_URL.rstrip("/")
+        if url.endswith("/wp-json/wp/v2"):
+            url = url[:-len("/wp-json/wp/v2")]
+        self.url = url
         cred = base64.b64encode(f"{WP_USER}:{WP_PASS}".encode()).decode()
         self.headers = {
             "Authorization": f"Basic {cred}",
