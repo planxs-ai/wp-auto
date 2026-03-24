@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-WordPress 카테고리 생성 + 네비게이션 메뉴 설정
-GitHub Actions 또는 로컬에서 실행 (WP 인증 환경변수 필요)
+WordPress 카테고리 생성 + 네비게이션 메뉴 정리
 """
 import os, json, sys, base64
 
@@ -23,7 +22,7 @@ HEADERS = {
 }
 API = f"{WP_URL}/wp-json/wp/v2"
 
-# ── 1. 카테고리 생성 ──
+# ── 1. 카테고리 확인/생성 ──
 TARGET_CATEGORIES = [
     {"name": "AI 도구 & 활용", "slug": "ai-tools", "description": "AI 도구 리뷰, 활용법, 자동화 팁"},
     {"name": "정부지원 & 혜택", "slug": "gov-support", "description": "정부 보조금, 지원금, 숨은 혜택 정보"},
@@ -33,103 +32,99 @@ TARGET_CATEGORIES = [
     {"name": "교육 & 생산성", "slug": "education", "description": "자기계발, 생산성 도구, 온라인 교육"},
 ]
 
-print("=== 카테고리 생성 ===")
+print("=== 카테고리 확인/생성 ===")
 cat_ids = {}
 for cat in TARGET_CATEGORIES:
-    # 이미 존재하는지 확인
     resp = requests.get(f"{API}/categories", params={"slug": cat["slug"]}, headers=HEADERS, timeout=10)
     existing = resp.json()
     if existing and len(existing) > 0:
         cat_ids[cat["slug"]] = existing[0]["id"]
-        print(f"  [EXISTS] {cat['name']} (id={existing[0]['id']})")
+        print(f"  [OK] {cat['name']} (id={existing[0]['id']})")
     else:
         resp = requests.post(f"{API}/categories", headers=HEADERS, json=cat, timeout=10)
         if resp.status_code == 201:
             cat_ids[cat["slug"]] = resp.json()["id"]
-            print(f"  [CREATED] {cat['name']} (id={resp.json()['id']})")
+            print(f"  [NEW] {cat['name']} (id={resp.json()['id']})")
         else:
-            print(f"  [ERROR] {cat['name']}: {resp.status_code} {resp.text[:200]}")
+            print(f"  [ERR] {cat['name']}: {resp.status_code}")
 
-# ── 2. 네비게이션 메뉴 설정 ──
-print("\n=== 메뉴 설정 ===")
+# ── 2. 기존 메뉴 아이템 전부 삭제 ──
+print("\n=== 기존 메뉴 아이템 정리 ===")
+MENU_ID = 3  # Main Menu
 
-# 기존 메뉴 확인 (WP REST API v2 + nav_menu)
-menu_resp = requests.get(
-    f"{WP_URL}/wp-json/wp/v2/navigation",
+items_resp = requests.get(
+    f"{API}/menu-items", params={"menus": MENU_ID, "per_page": 100},
     headers=HEADERS, timeout=10
 )
 
-# 메뉴 항목 구성 (홈 + 6개 카테고리)
-MENU_ITEMS = [
-    {"title": "홈", "url": WP_URL, "type": "custom"},
+if items_resp.status_code == 200:
+    old_items = items_resp.json()
+    print(f"  기존 아이템: {len(old_items)}개 → 전부 삭제")
+    for item in old_items:
+        del_resp = requests.delete(
+            f"{API}/menu-items/{item['id']}?force=true",
+            headers=HEADERS, timeout=10
+        )
+        status = "OK" if del_resp.status_code in (200, 204) else f"ERR({del_resp.status_code})"
+        print(f"    삭제 [{item['id']}] {item.get('title', {}).get('rendered', '?')[:30]} → {status}")
+else:
+    print(f"  메뉴 아이템 조회 실패: {items_resp.status_code}")
+
+# ── 3. 새 메뉴 아이템 생성 (홈 + 6 카테고리) ──
+print("\n=== 새 메뉴 생성 ===")
+
+NEW_MENU = [
+    {"title": "홈", "url": WP_URL + "/", "status": "publish", "menus": MENU_ID, "type": "custom", "menu_order": 1},
 ]
-for cat in TARGET_CATEGORIES:
-    if cat["slug"] in cat_ids:
-        MENU_ITEMS.append({
+
+for i, cat in enumerate(TARGET_CATEGORIES, start=2):
+    slug = cat["slug"]
+    if slug in cat_ids:
+        NEW_MENU.append({
             "title": cat["name"],
-            "url": f"{WP_URL}/category/{cat['slug']}/",
-            "type": "category",
-            "cat_id": cat_ids[cat["slug"]],
+            "url": f"{WP_URL}/category/{slug}/",
+            "status": "publish",
+            "menus": MENU_ID,
+            "type": "taxonomy",
+            "object": "category",
+            "object_id": cat_ids[slug],
+            "menu_order": i,
         })
 
-# WP 메뉴는 REST API로 직접 관리가 제한적이므로,
-# wp_nav_menu를 위한 메뉴 아이템을 생성하는 대안 접근
+for item in NEW_MENU:
+    resp = requests.post(f"{API}/menu-items", headers=HEADERS, json=item, timeout=10)
+    if resp.status_code == 200:
+        print(f"  [OK] {item['title']} (order={item['menu_order']}, id={resp.json()['id']})")
+    else:
+        # custom type fallback
+        item_fallback = {
+            "title": item["title"],
+            "url": item["url"],
+            "status": "publish",
+            "menus": MENU_ID,
+            "type": "custom",
+            "menu_order": item["menu_order"],
+        }
+        resp2 = requests.post(f"{API}/menu-items", headers=HEADERS, json=item_fallback, timeout=10)
+        if resp2.status_code == 200:
+            print(f"  [OK-fallback] {item['title']} (id={resp2.json()['id']})")
+        else:
+            print(f"  [ERR] {item['title']}: {resp.status_code} / fallback: {resp2.status_code}")
+            print(f"    {resp.text[:200]}")
 
-# 먼저 기존 메뉴 확인
-menus_resp = requests.get(
-    f"{WP_URL}/wp-json/wp/v2/menu-items",
+# ── 4. 최종 확인 ──
+print("\n=== 최종 메뉴 확인 ===")
+final_resp = requests.get(
+    f"{API}/menu-items", params={"menus": MENU_ID, "per_page": 50},
     headers=HEADERS, timeout=10
 )
-
-if menus_resp.status_code == 200:
-    existing_items = menus_resp.json()
-    print(f"  기존 메뉴 아이템: {len(existing_items)}개")
+if final_resp.status_code == 200:
+    items = sorted(final_resp.json(), key=lambda x: x.get("menu_order", 0))
+    for item in items:
+        title = item.get("title", {}).get("rendered", "?")
+        print(f"  [{item['menu_order']}] {title}")
+    print(f"\n메뉴 아이템 {len(items)}개 설정 완료!")
 else:
-    print(f"  메뉴 API 상태: {menus_resp.status_code}")
-    existing_items = []
-
-# 메뉴 위치에 할당된 메뉴 확인
-locations_resp = requests.get(
-    f"{WP_URL}/wp-json/wp/v2/menu-locations",
-    headers=HEADERS, timeout=10
-)
-if locations_resp.status_code == 200:
-    locations = locations_resp.json()
-    print(f"  메뉴 위치: {json.dumps(locations, ensure_ascii=False)[:300]}")
-else:
-    print(f"  메뉴 위치 API: {locations_resp.status_code}")
-
-# 기존 nav menus (termbased) 확인
-nav_menus = requests.get(
-    f"{WP_URL}/wp-json/wp/v2/menus",
-    headers=HEADERS, timeout=10
-)
-if nav_menus.status_code == 200:
-    for menu in nav_menus.json():
-        print(f"  메뉴: [{menu.get('id')}] {menu.get('name', '?')}")
-else:
-    print(f"  메뉴 조회: {nav_menus.status_code}")
-
-# ── 3. 기존 카테고리 정리 (옵션) ──
-print("\n=== 기존 카테고리 현황 ===")
-all_cats = requests.get(f"{API}/categories", params={"per_page": 50}, headers=HEADERS, timeout=10).json()
-for c in all_cats:
-    marker = " ★" if c["slug"] in cat_ids else ""
-    print(f"  [{c['id']:>3}] {c['name']:20s} ({c['count']}편){marker}")
-
-print(f"\n카테고리 {len(cat_ids)}개 준비 완료.")
-print("메뉴 설정은 WP Admin > 외모 > 메뉴에서 직접 설정하거나,")
-print("아래 스크립트로 자동 설정할 수 있습니다.")
-
-# ── 4. 페이지 기반 메뉴 아이템 (필수 페이지) ──
-print("\n=== 필수 페이지 확인 ===")
-pages_resp = requests.get(
-    f"{API}/pages", params={"per_page": 50, "_fields": "id,title,slug,status"},
-    headers=HEADERS, timeout=10
-)
-if pages_resp.status_code == 200:
-    pages = pages_resp.json()
-    for p in pages:
-        print(f"  [{p['id']:>3}] {p['title']['rendered']:30s} (/{p['slug']}/)")
+    print(f"  확인 실패: {final_resp.status_code}")
 
 print("\n완료!")
