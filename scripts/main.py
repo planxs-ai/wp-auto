@@ -1645,17 +1645,41 @@ class WordPressPublisher:
             log.error(f"발행 실패: {e}")
             return {"status": "failed", "error": str(e)}
 
+    # 카테고리 이름 → slug 매핑 (& 문자 검색 문제 방지)
+    _CAT_SLUG_MAP = {
+        "AI 도구 & 생산성": "ai-tools",
+        "재테크 & 투자": "finance-invest",
+        "부업 & 수익화": "side-income",
+        "IT & 테크 리뷰": "tech-review",
+        "정부지원 & 절세": "gov-support",
+        "생활 경제": "life-economy",
+    }
+
     def _get_or_create_category(self, name):
         import requests, html as _html
         try:
+            # 1순위: slug 기반 조회 (& 문자 안전)
+            slug = self._CAT_SLUG_MAP.get(name)
+            if slug:
+                resp = requests.get(f"{self.url}/wp-json/wp/v2/categories",
+                                   headers=self.headers, params={"slug": slug}, timeout=10)
+                cats = resp.json()
+                if cats:
+                    return cats[0]["id"]
+
+            # 2순위: name 검색 폴백
             resp = requests.get(f"{self.url}/wp-json/wp/v2/categories",
                                headers=self.headers, params={"search": name, "per_page": 5}, timeout=10)
             for c in resp.json():
-                # WP API returns HTML entities (e.g. &amp;) — decode before compare
                 if _html.unescape(c["name"]).lower() == name.lower():
                     return c["id"]
+
+            # 3순위: 새로 생성
+            create_data = {"name": name}
+            if slug:
+                create_data["slug"] = slug
             resp = requests.post(f"{self.url}/wp-json/wp/v2/categories",
-                                headers=self.headers, json={"name": name}, timeout=10)
+                                headers=self.headers, json=create_data, timeout=10)
             return resp.json().get("id")
         except Exception:
             return None
