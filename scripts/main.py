@@ -2885,7 +2885,12 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         intent = kw_data.get("intent", "informational")
         category = kw_data.get("category", "")
         kw_type = kw_data.get("type", "traffic")
+        # unique_seed: 명시적 _seed가 없으면 SITE_ID + keyword + timestamp로 자동 생성
         unique_seed = kw_data.get("_seed", "")
+        if not unique_seed:
+            unique_seed = hashlib.md5(
+                f"{SITE_ID}-{keyword}-{datetime.now(KST).isoformat()}-{random.random()}".encode()
+            ).hexdigest()[:12]
 
         log.info(f"\n{'='*50}")
         log.info(f"[{i}/{len(keywords)}] '{keyword}' ({kw_type})")
