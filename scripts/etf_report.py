@@ -573,7 +573,42 @@ def extract_title(content: str) -> tuple:
 # 5. WordPress 발행
 # ═══════════════════════════════════════════════════════
 
-def publish_to_wordpress(title: str, content: str, category: str = "ETF 시장분석") -> dict:
+def _get_or_create_tags(base_url: str, headers: dict, tag_names: list) -> list:
+    """태그 이름 목록 → WordPress 태그 ID 목록 (없으면 생성)"""
+    import requests
+    tag_ids = []
+    for name in tag_names[:8]:
+        try:
+            resp = requests.get(
+                f"{base_url}/wp-json/wp/v2/tags",
+                headers=headers,
+                params={"search": name, "per_page": 5},
+                timeout=10,
+            )
+            tags = resp.json()
+            found = None
+            for t in tags:
+                import html as _html
+                if _html.unescape(t["name"]).lower() == name.lower():
+                    found = t["id"]
+                    break
+            if not found:
+                resp = requests.post(
+                    f"{base_url}/wp-json/wp/v2/tags",
+                    headers=headers,
+                    json={"name": name},
+                    timeout=10,
+                )
+                found = resp.json().get("id")
+            if found:
+                tag_ids.append(found)
+        except Exception:
+            pass
+    return tag_ids
+
+
+def publish_to_wordpress(title: str, content: str, category: str = "ETF 시장분석",
+                         leading_sectors: list = None, target_stock: str = "") -> dict:
     """WordPress REST API로 발행"""
     import base64
     import requests
@@ -615,12 +650,23 @@ def publish_to_wordpress(title: str, content: str, category: str = "ETF 시장�
         log.warning(f"카테고리 처리 실패: {e}")
 
     today = datetime.now(KST).strftime("%Y-%m-%d")
+
+    # 태그 생성: 고정 + 주도섹터 + 핵심종목
+    tag_names = ["ETF", "ETF 시장분석", "섹터분석"]
+    if leading_sectors:
+        for s in leading_sectors[:3]:
+            tag_names.append(s.get("sector", ""))
+    if target_stock:
+        tag_names.append(target_stock)
+    tag_names = [t for t in tag_names if t]
+    tag_ids = _get_or_create_tags(url, headers, tag_names)
+
     post_data = {
         "title": title,
         "content": content,
         "status": "publish",
         "categories": [cat_id] if cat_id else [],
-        "tags": [],
+        "tags": tag_ids,
         "meta": {
             "rank_math_focus_keyword": f"ETF 시장분석 {today}",
             "rank_math_title": f"{title} | PlanX AI",
@@ -961,7 +1007,13 @@ def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False):
         log.error("WordPress 인증 정보 없음 (WP_URL, WP_USERNAME, WP_APP_PASSWORD)")
         return
 
-    result = publish_to_wordpress(title, content)
+    leading_sectors = daily_data.get("leading_sectors", [])
+    payload = _extract_payload(report)
+    result = publish_to_wordpress(
+        title, content,
+        leading_sectors=leading_sectors,
+        target_stock=payload.get("target_stock", "")
+    )
 
     if result["status"] == "published":
         log.info(f"발행 성공: {result.get('url', '')}")
