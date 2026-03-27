@@ -678,6 +678,69 @@ def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False):
         log.error("AI 글 생성 실패 — 종료")
         return
 
+    # Step 2.5: 프리미엄 스타일링 (main.py ContentFormatter 활용)
+    try:
+        from main import ContentFormatter
+        cf = ContentFormatter()
+        # ETF 리포트 전용 금융 테마 색상 적용
+        cf.H2_STYLE = (
+            'style="font-size:23px;font-weight:800;color:#0f172a;'
+            'margin:48px 0 20px;padding:16px 0 12px;'
+            'border-bottom:3px solid #1e40af"'
+        )
+        cf.H3_STYLE = (
+            'style="font-size:18px;font-weight:700;color:#1e293b;'
+            'margin:28px 0 12px;padding-left:12px;'
+            'border-left:4px solid #1e40af"'
+        )
+        cf.THEAD_STYLE = 'style="background:linear-gradient(135deg,#1e3a5f,#1e40af)"'
+        cf.TIP_BOX_STYLE = (
+            'style="background:linear-gradient(135deg,#eff6ff,#dbeafe);'
+            'border:1px solid #60a5fa;border-radius:12px;padding:20px 24px;margin:28px 0"'
+        )
+        cf.TIP_BOX_LABEL = (
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+            '<span style="font-size:20px">\U0001f4b0</span>'
+            '<span style="font-weight:700;color:#1e40af;font-size:14px;letter-spacing:0.5px">'
+            '\ud22c\uc790 \ud301</span></div>'
+        )
+        cf.KEY_POINT_STYLE = (
+            'style="background:linear-gradient(135deg,#fefce8,#fef9c3);'
+            'border-left:4px solid #ca8a04;'
+            'border-radius:0 12px 12px 0;padding:18px 24px;margin:28px 0"'
+        )
+        cf.KEY_POINT_LABEL = (
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+            '<span style="font-size:18px">\U0001f3af</span>'
+            '<span style="font-weight:700;color:#a16207;font-size:14px;letter-spacing:0.5px">'
+            '\ud575\uc2ec \ud3ec\uc778\ud2b8</span></div>'
+        )
+        cf.BLOCKQUOTE_STYLE = (
+            'style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);'
+            'border-left:4px solid #16a34a;border-radius:0 12px 12px 0;'
+            'padding:20px 24px;margin:28px 0;font-style:normal;color:#166534"'
+        )
+        cf.BLOCKQUOTE_LABEL = (
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+            '<span style="font-size:18px">\U0001f4ca</span>'
+            '<span style="font-weight:700;color:#166534;font-size:14px;letter-spacing:0.5px">'
+            '\uc560\ub110\ub9ac\uc2a4\ud2b8 \ud329\ud2b8\uccb4\ud06c</span></div>'
+        )
+        cf.CTA_BOX = (
+            '\n<div style="background:linear-gradient(135deg,#1e3a5f,#1e40af);'
+            'border-radius:16px;padding:28px 32px;margin:40px 0;text-align:center;'
+            'box-shadow:0 8px 32px rgba(30,64,175,0.25)">\n'
+            '<p style="color:#fff;font-size:18px;font-weight:700;margin:0 0 8px">'
+            '\U0001f4c8 \ub370\uc774\ud130 \uae30\ubc18 \ud22c\uc790 \uc778\uc0ac\uc774\ud2b8</p>\n'
+            '<p style="color:rgba(255,255,255,0.85);margin:0;font-size:14px;line-height:1.6">'
+            '\ubcf8 \ub9ac\ud3ec\ud2b8\ub294 \ud22c\uc790 \ucc38\uace0\uc6a9\uc774\uba70, \ud22c\uc790 \ud310\ub2e8\uc758 \ucc45\uc784\uc740 \ubcf8\uc778\uc5d0\uac8c \uc788\uc2b5\ub2c8\ub2e4.</p>\n'
+            '</div>\n'
+        )
+        content = cf.format(content, keyword="ETF 시장분석", category="finance-invest")
+        log.info("프리미엄 스타일링 적용 완료")
+    except Exception as e:
+        log.warning(f"스타일링 실패 (원문 유지): {e}")
+
     # Step 3: 제목 추출
     title, content = extract_title(content)
     import re
