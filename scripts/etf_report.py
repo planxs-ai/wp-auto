@@ -384,7 +384,7 @@ def build_etf_blog_prompt(report: dict) -> str:
 <h2>1. 오늘 돈은 어디로 흘러갔는가?</h2>
 <p>(주도섹터 분석. 왜 이 섹터가 강세인지 수급 근거와 등급 기반으로 서술. 400~500자.)</p>
 <table>
-<thead><tr><th style="width:25%">섹터</th><th style="width:15%">등급</th><th style="width:20%">등락률</th><th style="width:40%">주도 근거</th></tr></thead>
+<thead><tr><th style="width:15%">섹터</th><th style="width:10%">등급</th><th style="width:15%">등락률</th><th style="width:60%">주도 근거</th></tr></thead>
 <tbody>(주도섹터 TOP3 데이터 행)</tbody>
 </table>
 
@@ -397,7 +397,7 @@ def build_etf_blog_prompt(report: dict) -> str:
 <h2>3. 퀀트 모멘텀 스코어링</h2>
 <p>(단기 수급 + 중기 해자 관점에서 점수 산출. 각 점수의 근거를 1~2문장으로.)</p>
 <table>
-<thead><tr><th style="width:30%">팩터</th><th style="width:15%">점수</th><th style="width:55%">근거</th></tr></thead>
+<thead><tr><th style="width:25%">팩터</th><th style="width:12%">점수</th><th style="width:63%">근거</th></tr></thead>
 <tbody>
 <tr><td><strong>단기 모멘텀</strong> (수급/이슈)</td><td>[X]/10</td><td>(근거)</td></tr>
 <tr><td><strong>중기 모멘텀</strong> (성장/해자)</td><td>[X]/10</td><td>(근거)</td></tr>
@@ -899,13 +899,31 @@ def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False):
 
         content = cf.format(content, keyword="ETF 시장분석", category="finance-invest")
 
-        # 추가: strong 태그에 붉은/핑크 색상 적용
+        # 후처리 1: 테이블 헤더 색상 강제 → 녹색 (ContentFormatter가 덮어씌울 수 있으므로)
+        content = _re.sub(
+            r'<thead[^>]*style="background:[^"]*"[^>]*>',
+            '<thead style="background:linear-gradient(135deg,#065f46,#059669)">',
+            content, flags=_re.IGNORECASE
+        )
+        # th 흰색 텍스트 + 넉넉한 패딩
+        content = _re.sub(
+            r'<th(?!ead)[^>]*style="[^"]*"[^>]*>',
+            '<th style="padding:14px 20px;color:#ffffff;font-weight:700;text-align:left;font-size:14px;white-space:nowrap">',
+            content, flags=_re.IGNORECASE
+        )
+        # td 넉넉한 패딩 + 첫번째 td는 nowrap
+        content = _re.sub(
+            r'<td(?!body)[^>]*style="[^"]*"[^>]*>',
+            '<td style="padding:13px 20px;border-bottom:1px solid #e2e8f0;color:#1e293b;vertical-align:top">',
+            content, flags=_re.IGNORECASE
+        )
+
+        # 후처리 2: strong 태그에 붉은/핑크 색상 적용
         content = _re.sub(
             r'<strong style="[^"]*">',
             '<strong style="color:#be123c;background:#fce7f3;padding:1px 4px;border-radius:3px">',
             content
         )
-        # style 없는 strong도 처리
         content = _re.sub(
             r'<strong>(?!<)',
             '<strong style="color:#be123c">',
