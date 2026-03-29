@@ -52,7 +52,7 @@ export default function RevenuePage() {
 
         const channels = {};
         for (const r of current) {
-          const src = r.source || '\기\타';
+          const src = r.source || '\uae30\ud0c0';
           channels[src] = (channels[src] || 0) + (r.amount || 0);
         }
         setByChannel(channels);
@@ -63,7 +63,7 @@ export default function RevenuePage() {
         }
         setRevenueData(Object.entries(byDate).map(([date, amount]) => ({ date, amount })));
       } catch (err) {
-        setError(err.message || '\데\이\터\를 \불\러\오\지 \못\했\습\니\다');
+        setError(err.message || '\ub370\uc774\ud130\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4');
       }
       setLoading(false);
     }
@@ -78,15 +78,15 @@ export default function RevenuePage() {
 
   const currentStage = STAGES.find(s => s.id === monetizationStage) || STAGES[0];
 
-  if (loading) return <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>{'\로\딩 \중...'}</div>;
+  if (loading) return <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>{'\ub85c\ub529 \uc911...'}</div>;
 
   if (error) {
     return (
       <div style={{ maxWidth: 600, margin: '80px auto', textAlign: 'center' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>{'\⚠\️'}</div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{'\데\이\터\를 \불\러\오\지 \못\했\습\니\다'}</h2>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>{'\u26a0\ufe0f'}</div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{'\ub370\uc774\ud130\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4'}</h2>
         <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>{error}</p>
-        <ActionButton onClick={() => window.location.reload()} variant="secondary" style={{ marginTop: 16 }}>{'\다\시 \시\도'}</ActionButton>
+        <ActionButton onClick={() => window.location.reload()} variant="secondary" style={{ marginTop: 16 }}>{'\ub2e4\uc2dc \uc2dc\ub3c4'}</ActionButton>
       </div>
     );
   }
@@ -94,7 +94,7 @@ export default function RevenuePage() {
   if (!siteId) {
     return (
       <div style={{ maxWidth: 600, margin: '80px auto', textAlign: 'center' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>{'\�\�'}</div>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>{'\ud83d\udcb0'}</div>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>사이트를 먼저 연결해주세요</h2>
         <p style={{ color: 'var(--text-dim)', marginBottom: 24, fontSize: 14 }}>WordPress 사이트가 연결되면 수익 현황을 여기서 확인할 수 있습니다.</p>
         <ActionButton onClick={() => window.location.href = '/settings'}>설정에서 연결하기</ActionButton>
@@ -113,7 +113,7 @@ export default function RevenuePage() {
 
       {/* Channel Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <StatCard label="총 수익" value={fmtKRW(monthTotal)} color="var(--accent)" icon="\☆" />
+        <StatCard label="총 수익" value={fmtKRW(monthTotal)} color="var(--accent)" icon="\u2606" />
         {channelData.slice(0, 3).map(ch => (
           <StatCard key={ch.name} label={ch.name} value={fmtKRW(ch.value)} color="var(--green)" />
         ))}
@@ -136,7 +136,7 @@ export default function RevenuePage() {
                 tickFormatter={v => v.slice(5)} />
               <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false}
                 tickFormatter={v => `${Math.round(v / 1000)}k`} />
-              <Tooltip formatter={(v) => [`\₩${v.toLocaleString()}`, '수익']}
+              <Tooltip formatter={(v) => [`\u20a9${v.toLocaleString()}`, '수익']}
                 contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }} />
               <Area type="monotone" dataKey="amount" stroke="var(--accent)" strokeWidth={2}
                 fill="url(#revGrad)" />
@@ -168,7 +168,7 @@ export default function RevenuePage() {
                     width: 28, height: 28, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isDone ? 'var(--green)' : isCurrent ? stage.color : 'var(--border-light)',
                     color: '#fff', fontSize: 13, fontWeight: 700,
-                  }}>{isDone ? '\✓' : stage.id}</div>
+                  }}>{isDone ? '\u2713' : stage.id}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{stage.label}</div>
                   {isCurrent && <Badge text="현재" color="purple" />}
                   {isDone && <Badge text="완료" color="green" />}
@@ -205,8 +205,8 @@ export default function RevenuePage() {
 }
 
 function fmtKRW(n) {
-  if (n >= 10000) return `\₩${(n / 10000).toFixed(1)}만`;
-  return `\₩${(n || 0).toLocaleString('ko-KR')}`;
+  if (n >= 10000) return `\u20a9${(n / 10000).toFixed(1)}만`;
+  return `\u20a9${(n || 0).toLocaleString('ko-KR')}`;
 }
 
 function getPrevMonthStart() {

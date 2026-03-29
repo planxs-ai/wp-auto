@@ -13,12 +13,12 @@ const SCHEDULE_PRESETS = [
 ];
 
 const SETUP_ACTIONS = [
-  { id: 'setup-menu', label: '\메\뉴 \자\동 \설\정', desc: 'About, Privacy, Contact \등 \필\수 \페\이\지 + \네\비\게\이\션 \메\뉴 \생\성',
-    icon: '\�\�', successMsg: '\메\뉴 \설\정 \완\료! 1~2\분 \후 \사\이\트\에 \반\영\됩\니\다.' },
-  { id: 'inject-css', label: 'CSS \디\자\인 \적\용', desc: '\블\로\그 \테\마\에 \맞\춤 \스\타\일\링 \자\동 \적\용',
-    icon: '\�\�', successMsg: 'CSS \적\용 \완\료! 1~2\분 \후 \사\이\트\에 \반\영\됩\니\다.' },
-  { id: 'publish', label: '\첫 \글 \발\행 (3\편)', desc: 'AI\가 \자\동\으\로 3\편\의 \글\을 \작\성\하\여 \발\행',
-    icon: '\�\�', inputs: { count: '3' }, successMsg: '\발\행 \시\작! 5~10\분 \후 \블\로\그\에 \글\이 \올\라\갑\니\다.' },
+  { id: 'setup-menu', label: '\uba54\ub274 \uc790\ub3d9 \uc124\uc815', desc: 'About, Privacy, Contact \ub4f1 \ud544\uc218 \ud398\uc774\uc9c0 + \ub124\ube44\uac8c\uc774\uc158 \uba54\ub274 \uc0dd\uc131',
+    icon: '\ud83d\udccc', successMsg: '\uba54\ub274 \uc124\uc815 \uc644\ub8cc! 1~2\ubd84 \ud6c4 \uc0ac\uc774\ud2b8\uc5d0 \ubc18\uc601\ub429\ub2c8\ub2e4.' },
+  { id: 'inject-css', label: 'CSS \ub514\uc790\uc778 \uc801\uc6a9', desc: '\ube14\ub85c\uadf8 \ud14c\ub9c8\uc5d0 \ub9de\ucda4 \uc2a4\ud0c0\uc77c\ub9c1 \uc790\ub3d9 \uc801\uc6a9',
+    icon: '\ud83c\udfa8', successMsg: 'CSS \uc801\uc6a9 \uc644\ub8cc! 1~2\ubd84 \ud6c4 \uc0ac\uc774\ud2b8\uc5d0 \ubc18\uc601\ub429\ub2c8\ub2e4.' },
+  { id: 'publish', label: '\uccab \uae00 \ubc1c\ud589 (3\ud3b8)', desc: 'AI\uac00 \uc790\ub3d9\uc73c\ub85c 3\ud3b8\uc758 \uae00\uc744 \uc791\uc131\ud558\uc5ec \ubc1c\ud589',
+    icon: '\ud83d\udcdd', inputs: { count: '3' }, successMsg: '\ubc1c\ud589 \uc2dc\uc791! 5~10\ubd84 \ud6c4 \ube14\ub85c\uadf8\uc5d0 \uae00\uc774 \uc62c\ub77c\uac11\ub2c8\ub2e4.' },
 ];
 
 export default function SettingsPage() {
@@ -117,15 +117,15 @@ export default function SettingsPage() {
             <div style={{
               width: 40, height: 40, borderRadius: 10, background: 'var(--accent-bg)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-            }}>{'\�\�'}</div>
+            }}>{'\ud83c\udf10'}</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{site.name || site.domain}</div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                {'\✅'} 연결됨
+                {'\u2705'} 연결됨
                 {site.domain && (
                   <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer"
                     style={{ marginLeft: 8, color: 'var(--accent)', textDecoration: 'none' }}>
-                    방문 {'\↗'}
+                    방문 {'\u2197'}
                   </a>
                 )}
               </div>
@@ -186,7 +186,7 @@ export default function SettingsPage() {
                     <PillButton key={item.slug} selected={selectedCats.includes(item.slug)}
                       onClick={() => !locked && toggleCat(item.slug)} disabled={locked}>
                       {item.icon} {item.ko}
-                      {locked && ' \�\�'}
+                      {locked && ' \ud83d\udd12'}
                     </PillButton>
                   );
                 })}
@@ -221,7 +221,7 @@ export default function SettingsPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{action.label}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                    {isDone ? action.successMsg : isFailed ? `\❌ ${setupStatus[`${action.id}_error`] || '\실\패'}. \다\시 \시\도\해\주\세\요.` : action.desc}
+                    {isDone ? action.successMsg : isFailed ? `\u274c ${setupStatus[`${action.id}_error`] || '\uc2e4\ud328'}. \ub2e4\uc2dc \uc2dc\ub3c4\ud574\uc8fc\uc138\uc694.` : action.desc}
                   </div>
                 </div>
                 <ActionButton
@@ -243,7 +243,7 @@ export default function SettingsPage() {
                       if (data.success) {
                         setSetupStatus(prev => ({ ...prev, [action.id]: 'done' }));
                       } else {
-                        setSetupStatus(prev => ({ ...prev, [action.id]: 'failed', [`${action.id}_error`]: data.error || '\실\패' }));
+                        setSetupStatus(prev => ({ ...prev, [action.id]: 'failed', [`${action.id}_error`]: data.error || '\uc2e4\ud328' }));
                       }
                     } catch {
                       setSetupStatus(prev => ({ ...prev, [action.id]: 'failed' }));
@@ -251,14 +251,14 @@ export default function SettingsPage() {
                   }}
                   style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap' }}
                 >
-                  {isLoading ? '\실\행 \중...' : isDone ? '\✅ \완\료' : '\실\행'}
+                  {isLoading ? '\uc2e4\ud589 \uc911...' : isDone ? '\u2705 \uc644\ub8cc' : '\uc2e4\ud589'}
                 </ActionButton>
               </div>
             );
           })}
         </div>
         <div style={{ marginTop: 12, padding: 10, background: 'var(--input-bg)', borderRadius: 8, fontSize: 11, color: 'var(--text-dim)' }}>
-          {'\�\�'} \처\음 \설\정 \시 \메\뉴 \→ CSS \→ \글 \발\행 \순\서\로 \실\행\하\는 \것\을 \추\천\합\니\다.
+          {'\ud83d\udca1'} \ucc98\uc74c \uc124\uc815 \uc2dc \uba54\ub274 \u2192 CSS \u2192 \uae00 \ubc1c\ud589 \uc21c\uc11c\ub85c \uc2e4\ud589\ud558\ub294 \uac83\uc744 \ucd94\ucc9c\ud569\ub2c8\ub2e4.
         </div>
       </Card>
 

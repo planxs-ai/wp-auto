@@ -67,7 +67,7 @@ export default function ConsumerDashboard() {
       setPrevMonthRevenue((prevRevenueRes.data || []).reduce((s, r) => s + (r.amount || 0), 0));
       setRevenueTrend(aggregateTrend(trendRes.data || []));
       } catch (err) {
-        setError(err.message || '\데\이\터\를 \불\러\오\지 \못\했\습\니\다');
+        setError(err.message || '\ub370\uc774\ud130\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4');
       }
       setLoading(false);
     }
@@ -100,16 +100,16 @@ export default function ConsumerDashboard() {
   }, [totalPosts, monetizationStage]);
 
   if (loading) {
-    return <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>{'\대\시\보\드 \로\딩 \중...'}</div>;
+    return <div style={{ padding: 40, color: 'var(--text-dim)', textAlign: 'center' }}>{'\ub300\uc2dc\ubcf4\ub4dc \ub85c\ub529 \uc911...'}</div>;
   }
 
   if (error) {
     return (
       <div style={{ maxWidth: 600, margin: '80px auto', textAlign: 'center' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>{'\⚠\️'}</div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{'\데\이\터\를 \불\러\오\지 \못\했\습\니\다'}</h2>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>{'\u26a0\ufe0f'}</div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{'\ub370\uc774\ud130\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4'}</h2>
         <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>{error}</p>
-        <ActionButton onClick={() => window.location.reload()} variant="secondary" style={{ marginTop: 16 }}>{'\다\시 \시\도'}</ActionButton>
+        <ActionButton onClick={() => window.location.reload()} variant="secondary" style={{ marginTop: 16 }}>{'\ub2e4\uc2dc \uc2dc\ub3c4'}</ActionButton>
       </div>
     );
   }
@@ -117,7 +117,7 @@ export default function ConsumerDashboard() {
   if (!siteId) {
     return (
       <div style={{ maxWidth: 600, margin: '80px auto', textAlign: 'center' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>{'\�\�'}</div>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>{'\ud83c\udf10'}</div>
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>사이트를 연결해주세요</h2>
         <p style={{ color: 'var(--text-dim)', marginBottom: 24 }}>블로그 사이트를 연결하면 자동 발행이 시작됩니다.</p>
         <ActionButton onClick={() => window.location.href = '/settings'}>사이트 연결하기</ActionButton>
@@ -139,13 +139,13 @@ export default function ConsumerDashboard() {
 
       {/* Score Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 32 }}>
-        <StatCard label="오늘 발행" value={`${todayStats.posts}편`} color="var(--accent)" icon="\▣"
+        <StatCard label="오늘 발행" value={`${todayStats.posts}편`} color="var(--accent)" icon="\u25a3"
           sub={todayStats.posts > 0 ? `목표 ${plan.maxDailyPosts === 999 ? '무제한' : plan.maxDailyPosts}편` : '발행 대기 중'} />
         <StatCard label="이달 수익" value={fmtKRW(monthRevenue)} color="var(--green)"
-          icon="\☆" sub={revenueChange !== 0 ? `${revenueChange > 0 ? '\▲' : '\▼'}${Math.abs(revenueChange)}% vs 지난달` : ''} />
-        <StatCard label="총 발행" value={`${totalPosts}편`} color="var(--blue)" icon="\◎" />
+          icon="\u2606" sub={revenueChange !== 0 ? `${revenueChange > 0 ? '\u25b2' : '\u25bc'}${Math.abs(revenueChange)}% vs 지난달` : ''} />
+        <StatCard label="총 발행" value={`${totalPosts}편`} color="var(--blue)" icon="\u25ce" />
         <StatCard label="블로그 건강도" value={`${healthScore}점`} color={healthColor}
-          icon="\◉" sub={healthLabel} />
+          icon="\u25c9" sub={healthLabel} />
       </div>
 
       {/* Revenue Trend */}
@@ -164,7 +164,7 @@ export default function ConsumerDashboard() {
                 tickFormatter={v => v.slice(5)} />
               <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false}
                 tickFormatter={v => `${Math.round(v / 1000)}k`} />
-              <Tooltip formatter={(v) => [`\₩${v.toLocaleString()}`, '수익']}
+              <Tooltip formatter={(v) => [`\u20a9${v.toLocaleString()}`, '수익']}
                 contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }} />
               <Area type="monotone" dataKey="amount" stroke="var(--accent)" strokeWidth={2}
                 fill="url(#colorRevenue)" />
@@ -186,7 +186,7 @@ export default function ConsumerDashboard() {
             background: 'var(--accent-bg)',
           }}>
             <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
-              {'\�\�'} {smartAction.text}
+              {'\ud83c\udfaf'} {smartAction.text}
             </div>
             {smartAction.action && (
               <div style={{ marginTop: 10 }}>
@@ -219,7 +219,7 @@ export default function ConsumerDashboard() {
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
                       {post.published_at ? new Date(post.published_at).toLocaleDateString('ko-KR') : ''}
-                      {post.niche && ` \· ${post.niche}`}
+                      {post.niche && ` \u00b7 ${post.niche}`}
                     </div>
                   </div>
                   {post.quality_score != null && (
@@ -249,7 +249,7 @@ export default function ConsumerDashboard() {
             return (
               <div key={ms.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ fontSize: 20, width: 32, textAlign: 'center', opacity: achieved ? 1 : 0.4 }}>
-                  {achieved ? '\✅' : ms.icon}</div>
+                  {achieved ? '\u2705' : ms.icon}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: achieved ? 'var(--green)' : 'var(--text)' }}>
@@ -293,8 +293,8 @@ export default function ConsumerDashboard() {
 // ── Helpers ──
 
 function fmtKRW(n) {
-  if (n >= 10000) return `\₩${(n / 10000).toFixed(1)}만`;
-  return `\₩${(n || 0).toLocaleString('ko-KR')}`;
+  if (n >= 10000) return `\u20a9${(n / 10000).toFixed(1)}만`;
+  return `\u20a9${(n || 0).toLocaleString('ko-KR')}`;
 }
 
 function getPrevMonthStart() {

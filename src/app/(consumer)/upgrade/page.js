@@ -7,15 +7,15 @@ const FEATURE_LIST = [
   { key: 'sites', label: '사이트 수', getValue: (p) => p.maxSites === 999 ? '무제한' : `${p.maxSites}개` },
   { key: 'posts', label: '일일 발행', getValue: (p) => p.maxDailyPosts === 999 ? '무제한' : `${p.maxDailyPosts}편` },
   { key: 'categories', label: '카테고리', getValue: (p) => p.maxCategories === 999 ? '전체' : `${p.maxCategories}개` },
-  { key: 'goldenMode', label: 'Golden Mode', getValue: (p) => p.features.goldenMode ? '\✅' : '\❌' },
-  { key: 'polishing', label: 'AI 폴리싱', getValue: (p) => p.features.polishing ? 'Claude Sonnet' : '\❌' },
-  { key: 'customSchedule', label: '커스텀 스케줄', getValue: (p) => p.features.customSchedule ? '\✅' : '\❌' },
-  { key: 'modelSelection', label: 'AI 모델 선택', getValue: (p) => p.features.modelSelection ? '\✅' : '\❌' },
-  { key: 'revenueSimulation', label: '수익 시뮬레이션', getValue: (p) => p.features.revenueSimulation ? '\✅' : '\❌' },
-  { key: 'seoAnalysis', label: 'SEO 분석', getValue: (p) => p.features.seoAnalysis ? '\✅' : '\❌' },
-  { key: 'telegramAlerts', label: 'Telegram 알림', getValue: (p) => p.features.telegramAlerts ? '\✅' : '\❌' },
-  { key: 'snsAutomation', label: 'SNS 자동화', getValue: (p) => p.features.snsAutomation ? '\✅' : '\❌' },
-  { key: 'marketingContent', label: '마케팅 글 생성', getValue: (p) => p.features.marketingContent ? '\✅' : '\❌' },
+  { key: 'goldenMode', label: 'Golden Mode', getValue: (p) => p.features.goldenMode ? '\u2705' : '\u274c' },
+  { key: 'polishing', label: 'AI 폴리싱', getValue: (p) => p.features.polishing ? 'Claude Sonnet' : '\u274c' },
+  { key: 'customSchedule', label: '커스텀 스케줄', getValue: (p) => p.features.customSchedule ? '\u2705' : '\u274c' },
+  { key: 'modelSelection', label: 'AI 모델 선택', getValue: (p) => p.features.modelSelection ? '\u2705' : '\u274c' },
+  { key: 'revenueSimulation', label: '수익 시뮬레이션', getValue: (p) => p.features.revenueSimulation ? '\u2705' : '\u274c' },
+  { key: 'seoAnalysis', label: 'SEO 분석', getValue: (p) => p.features.seoAnalysis ? '\u2705' : '\u274c' },
+  { key: 'telegramAlerts', label: 'Telegram 알림', getValue: (p) => p.features.telegramAlerts ? '\u2705' : '\u274c' },
+  { key: 'snsAutomation', label: 'SNS 자동화', getValue: (p) => p.features.snsAutomation ? '\u2705' : '\u274c' },
+  { key: 'marketingContent', label: '마케팅 글 생성', getValue: (p) => p.features.marketingContent ? '\u2705' : '\u274c' },
 ];
 
 export default function UpgradePage() {
@@ -56,13 +56,13 @@ export default function UpgradePage() {
 
               <div style={{ marginBottom: 16 }}>
                 <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)' }}>
-                  \₩{(p.price.monthly / 1000).toFixed(0)}K
+                  \u20a9{(p.price.monthly / 1000).toFixed(0)}K
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--text-dim)' }}> /월</span>
               </div>
 
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
-                연간 결제 시 \₩{(p.price.yearly / 1000).toFixed(0)}K/년
+                연간 결제 시 \u20a9{(p.price.yearly / 1000).toFixed(0)}K/년
                 <span style={{ color: 'var(--green)', fontWeight: 600 }}>
                   {' '}(2개월 무료)
                 </span>

@@ -7,14 +7,14 @@ import { CONSUMER_CATEGORIES } from '@/lib/plan-features';
 import { Card, InputField, ActionButton, PillButton } from '@/components/ui';
 
 const BLOG_STAGES = [
-  { id: 'new', label: '\처\음 \시\작', desc: '\블\로\그\를 \막 \개\설\했\거\나 \글\이 \거\의 \없\어\요', icon: '\�\�', color: '#3b82f6', stage: 1,
-    result: 'AdSense \승\인\을 \목\표\로 \순\수 \정\보\성 \글\을 \발\행\합\니\다.' },
-  { id: 'pre-adsense', label: 'AdSense \승\인 \전', desc: '\글\은 \있\지\만 \아\직 AdSense \승\인\을 \못 \받\았\어\요', icon: '\�\�', color: '#f59e0b', stage: 1,
-    result: 'AdSense \승\인 \조\건\을 \맞\추\며 \품\질 \높\은 \글\을 \발\행\합\니\다.' },
-  { id: 'post-adsense', label: 'AdSense \승\인 \완\료', desc: 'AdSense\는 \되\었\는\데 \수\익\이 \적\어\요', icon: '\✅', color: '#10b981', stage: 2,
-    result: 'AdSense + \텐\핑 CPA\로 \수\익\화\를 \시\작\합\니\다.' },
-  { id: 'monetizing', label: '\수\익\화 \진\행 \중', desc: '\쿠\팡/\텐\핑 \등 \수\익 \채\널\을 \이\미 \사\용 \중\이\에\요', icon: '\�\�', color: '#7c3aed', stage: 3,
-    result: '\모\든 \수\익 \채\널\을 \자\동\화\하\고 \극\대\화\합\니\다!' },
+  { id: 'new', label: '\ucc98\uc74c \uc2dc\uc791', desc: '\ube14\ub85c\uadf8\ub97c \ub9c9 \uac1c\uc124\ud588\uac70\ub098 \uae00\uc774 \uac70\uc758 \uc5c6\uc5b4\uc694', icon: '\ud83c\udf31', color: '#3b82f6', stage: 1,
+    result: 'AdSense \uc2b9\uc778\uc744 \ubaa9\ud45c\ub85c \uc21c\uc218 \uc815\ubcf4\uc131 \uae00\uc744 \ubc1c\ud589\ud569\ub2c8\ub2e4.' },
+  { id: 'pre-adsense', label: 'AdSense \uc2b9\uc778 \uc804', desc: '\uae00\uc740 \uc788\uc9c0\ub9cc \uc544\uc9c1 AdSense \uc2b9\uc778\uc744 \ubabb \ubc1b\uc558\uc5b4\uc694', icon: '\ud83d\udcdd', color: '#f59e0b', stage: 1,
+    result: 'AdSense \uc2b9\uc778 \uc870\uac74\uc744 \ub9de\ucd94\uba70 \ud488\uc9c8 \ub192\uc740 \uae00\uc744 \ubc1c\ud589\ud569\ub2c8\ub2e4.' },
+  { id: 'post-adsense', label: 'AdSense \uc2b9\uc778 \uc644\ub8cc', desc: 'AdSense\ub294 \ub418\uc5c8\ub294\ub370 \uc218\uc775\uc774 \uc801\uc5b4\uc694', icon: '\u2705', color: '#10b981', stage: 2,
+    result: 'AdSense + \ud150\ud551 CPA\ub85c \uc218\uc775\ud654\ub97c \uc2dc\uc791\ud569\ub2c8\ub2e4.' },
+  { id: 'monetizing', label: '\uc218\uc775\ud654 \uc9c4\ud589 \uc911', desc: '\ucfe0\ud321/\ud150\ud551 \ub4f1 \uc218\uc775 \ucc44\ub110\uc744 \uc774\ubbf8 \uc0ac\uc6a9 \uc911\uc774\uc5d0\uc694', icon: '\ud83d\udcb0', color: '#7c3aed', stage: 3,
+    result: '\ubaa8\ub4e0 \uc218\uc775 \ucc44\ub110\uc744 \uc790\ub3d9\ud654\ud558\uace0 \uadf9\ub300\ud654\ud569\ub2c8\ub2e4!' },
 ];
 
 const SCHEDULE_PRESETS = [
@@ -163,7 +163,7 @@ export default function OnboardingPage() {
       {/* Step 1: Site Connection */}
       {step === 1 && (
         <Card style={styles.card}>
-          <div style={styles.stepIcon}>{'\�\�'}</div>
+          <div style={styles.stepIcon}>{'\ud83c\udf10'}</div>
           <h2 style={styles.stepTitle}>사이트 연결</h2>
           <p style={styles.stepDesc}>WordPress 사이트를 연결하면 자동 발행이 시작됩니다.</p>
 
@@ -185,12 +185,12 @@ export default function OnboardingPage() {
             </div>
             {siteTestResult === 'success' && (
               <div style={{ ...styles.testResult, background: 'var(--green-bg)', color: 'var(--green)' }}>
-                {'\✅'} 연결 성공! WordPress 사이트가 확인되었습니다.
+                {'\u2705'} 연결 성공! WordPress 사이트가 확인되었습니다.
               </div>
             )}
             {siteTestResult === 'failed' && (
               <div style={{ ...styles.testResult, background: 'var(--red-bg)', color: 'var(--red)' }}>
-                {'\❌'} 연결 실패. URL과 인증 정보를 확인해주세요.
+                {'\u274c'} 연결 실패. URL과 인증 정보를 확인해주세요.
               </div>
             )}
             {siteTestResult === 'testing' && (
@@ -210,7 +210,7 @@ export default function OnboardingPage() {
       {/* Step 2: Categories */}
       {step === 2 && (
         <Card style={styles.card}>
-          <div style={styles.stepIcon}>{'\�\�'}</div>
+          <div style={styles.stepIcon}>{'\ud83d\udcc2'}</div>
           <h2 style={styles.stepTitle}>카테고리 선택</h2>
           <p style={styles.stepDesc}>어떤 주제의 글을 발행할까요? 최소 2개를 선택해주세요.</p>
 
@@ -233,7 +233,7 @@ export default function OnboardingPage() {
           </div>
 
           <div style={{ marginTop: 16, padding: 12, background: 'var(--accent-bg)', borderRadius: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
-            {'\�\�'} <strong>AI 도구 + 재테크</strong> 조합이 수익률이 가장 높습니다!
+            {'\ud83d\udca1'} <strong>AI 도구 + 재테크</strong> 조합이 수익률이 가장 높습니다!
           </div>
         </Card>
       )}
@@ -241,7 +241,7 @@ export default function OnboardingPage() {
       {/* Step 3: Schedule */}
       {step === 3 && (
         <Card style={styles.card}>
-          <div style={styles.stepIcon}>{'\�\�'}</div>
+          <div style={styles.stepIcon}>{'\ud83d\udd53'}</div>
           <h2 style={styles.stepTitle}>발행 스케줄</h2>
           <p style={styles.stepDesc}>글을 자동으로 발행할 시간을 선택하세요. 언제든 변경할 수 있습니다.</p>
 
@@ -271,7 +271,7 @@ export default function OnboardingPage() {
       {/* Step 4: Blog Stage */}
       {step === 4 && (
         <Card style={styles.card}>
-          <div style={styles.stepIcon}>{'\�\�'}</div>
+          <div style={styles.stepIcon}>{'\ud83d\udcca'}</div>
           <h2 style={styles.stepTitle}>현재 어느 단계인가요?</h2>
           <p style={styles.stepDesc}>선택하시면 단계에 맞는 최적의 전략을 자동으로 설정합니다.</p>
 
@@ -299,7 +299,7 @@ export default function OnboardingPage() {
 
           {blogStage && (
             <div style={{ marginTop: 16, padding: 12, background: 'var(--accent-bg)', borderRadius: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
-              {'\✅'} {BLOG_STAGES.find(s => s.id === blogStage)?.result}
+              {'\u2705'} {BLOG_STAGES.find(s => s.id === blogStage)?.result}
             </div>
           )}
         </Card>
@@ -308,7 +308,7 @@ export default function OnboardingPage() {
       {/* Step 5: Complete */}
       {step === 5 && (
         <Card style={{ ...styles.card, textAlign: 'center' }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>{'\�\�'}</div>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>{'\ud83c\udf89'}</div>
           <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>준비 완료!</h2>
           <p style={{ color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
             첫 글이 곧 자동 발행됩니다.<br />
@@ -323,10 +323,10 @@ export default function OnboardingPage() {
               설정 요약
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-              {'\�\�'} {wpUrl}<br />
-              {'\�\�'} {selectedCats.length}개 카테고리 선택<br />
-              {'\�\�'} {SCHEDULE_PRESETS.find(p => p.id === schedulePreset)?.label}<br />
-              {'\�\�'} {BLOG_STAGES.find(s => s.id === blogStage)?.label || '미선택'}
+              {'\ud83c\udf10'} {wpUrl}<br />
+              {'\ud83d\udcc2'} {selectedCats.length}개 카테고리 선택<br />
+              {'\ud83d\udd53'} {SCHEDULE_PRESETS.find(p => p.id === schedulePreset)?.label}<br />
+              {'\ud83d\udcca'} {BLOG_STAGES.find(s => s.id === blogStage)?.label || '미선택'}
             </div>
           </div>
 
@@ -334,7 +334,7 @@ export default function OnboardingPage() {
             padding: 12, background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
             borderRadius: 10, fontSize: 12, color: 'var(--accent)', fontWeight: 500, marginBottom: 20,
           }}>
-            {'\�\�'} Premium 7일 무료 체험이 활성화되었습니다!
+            {'\ud83c\udf81'} Premium 7일 무료 체험이 활성화되었습니다!
           </div>
         </Card>
       )}
