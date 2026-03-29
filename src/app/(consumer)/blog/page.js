@@ -166,10 +166,11 @@ export default function BlogPage() {
             <SectionTitle>카테고리 분포</SectionTitle>
             {nicheData.length > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height={180}>
+                <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie data={nicheData} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                      innerRadius={40} outerRadius={70} paddingAngle={2}>
+                      innerRadius={35} outerRadius={65} paddingAngle={2}
+                      label={({ name, value }) => `${value}`}>
                       {nicheData.map((_, i) => (
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
@@ -178,12 +179,12 @@ export default function BlogPage() {
                       contentStyle={{ borderRadius: 10, fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
-                  {nicheData.slice(0, 5).map((d, i) => (
-                    <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: 2, background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                      <span style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
-                      <span style={{ marginLeft: 'auto', color: 'var(--text-dim)' }}>{d.value}편</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  {nicheData.slice(0, 8).map((d, i) => (
+                    <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 2, background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
+                      <span style={{ color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
+                      <span style={{ color: 'var(--text)', fontWeight: 600, flexShrink: 0 }}>{d.value}편</span>
                     </div>
                   ))}
                 </div>
