@@ -366,6 +366,40 @@ const CHART_TICK = { fill: '#94a3b8', fontSize: 11 };
 // MAIN DASHBOARD
 // ═══════════════════════════════════════════
 
+function AdminGate({ children }) {
+  const [authState, setAuthState] = useState('loading'); // loading | admin | redirect
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) {
+        window.location.href = '/login';
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      if (profile?.role === 'admin') {
+        setAuthState('admin');
+      } else {
+        window.location.href = '/dashboard';
+      }
+    });
+  }, []);
+
+  if (authState === 'loading') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f' }}>
+        <div style={{ color: '#666', fontSize: 14 }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (authState !== 'admin') return null;
+  return children;
+}
+
 export default function Dashboard() {
   const [tab, setTab] = useState('dash');
   const [selectedSite, setSelectedSite] = useState('site-1');
@@ -486,7 +520,7 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, [selNiches, tz, preset, selDays, selTimes, postsPerRun, affKeys, adChecks, lang, autoMode, snsOn, saas, configLoaded, saveConfig]);
 
-  if (!isConfigured) return <SetupGuide />;
+  if (!isConfigured) return <AdminGate><SetupGuide /></AdminGate>;
 
   const sharedProps = {
     siteId: selectedSite, selNiches, toggleNiche, tz, setTz, preset, setPreset,
@@ -501,6 +535,7 @@ export default function Dashboard() {
   };
 
   return (
+    <AdminGate>
     <div style={{ minHeight: '100vh', background: '#FAFBFC' }}>
       {/* ── Header ── */}
       <header style={{
@@ -642,6 +677,7 @@ export default function Dashboard() {
         {tab === 'admin' && <AdminTab {...sharedProps} />}
       </main>
     </div>
+    </AdminGate>
   );
 }
 

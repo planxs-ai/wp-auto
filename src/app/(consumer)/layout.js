@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: '홈', icon: '◎', path: '/dashboard' },
   { id: 'blog', label: '내 블로그', icon: '▣', path: '/blog' },
   { id: 'revenue', label: '수익', icon: '☆', path: '/revenue' },
+  { id: 'guide', label: '가이드', icon: '📖', path: '/guide' },
   { id: 'settings', label: '설정', icon: '⚙', path: '/settings' },
 ];
 
