@@ -32,7 +32,7 @@ export default function LoginPage() {
           return;
         }
         await signUp(email, password, displayName);
-        setSignupSuccess(true);
+        router.push('/onboarding');
       }
     } catch (err) {
       const msg = err.message || '오류가 발생했습니다';
@@ -42,7 +42,14 @@ export default function LoginPage() {
         'User already registered': '이미 가입된 이메일입니다',
         'Password should be at least 6 characters': '비밀번호는 6자 이상이어야 합니다',
         'Signups not allowed for this instance': '회원가입이 비활성화되어 있습니다',
+        'Email rate limit exceeded': '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.',
+        'For security purposes, you can only request this once every 60 seconds': '보안을 위해 60초에 한 번만 요청할 수 있습니다. 잠시 후 다시 시도해주세요.',
       };
+      // rate limit 관련 메시지 패턴 매칭
+      if (!messages[msg] && (msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many'))) {
+        setError('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
+        return;
+      }
       setError(messages[msg] || msg);
     } finally {
       setLoading(false);
