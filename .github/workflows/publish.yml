@@ -87,12 +87,17 @@ jobs:
             NICHE=""
           fi
 
-          ARGS="--all-sites --count $COUNT --pipeline $PIPELINE --golden"
+          ARGS="--count $COUNT --pipeline $PIPELINE --golden"
           if [ "$DRY_RUN" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
           if [ -n "$NICHE" ]; then
             ARGS="$ARGS --niche $NICHE"
+          fi
+
+          # Supabase 연결 시 멀티사이트, 없으면 환경변수 단일 사이트
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_KEY" ]; then
+            ARGS="--all-sites $ARGS"
           fi
 
           python scripts/main.py $ARGS

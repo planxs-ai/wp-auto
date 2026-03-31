@@ -3193,6 +3193,10 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
     log.info(f"  네이버 카페: {'(O)' if NAVER_REFRESH_TOKEN else '(X)'}")
     log.info("=" * 60)
 
+    # 대시보드 스케줄 게이트: 현재 시각이 발행 시간대가 아니면 스킵
+    if not dry_run and not should_run_now():
+        return
+
     if not site_override:
         check_api_status()
 
