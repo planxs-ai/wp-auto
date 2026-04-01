@@ -65,21 +65,27 @@ if not menu_id:
 
 print(f"  사용할 메뉴: ID={menu_id}")
 
-# ── 3. 기존 메뉴 아이템 전부 삭제 ──
+# ── 3. 기존 메뉴 아이템 전부 삭제 (2회 반복으로 확실히) ──
 print(f"\n=== 기존 메뉴 아이템 삭제 (메뉴 {menu_id}) ===")
-items_resp = requests.get(
-    f"{API}/menu-items", params={"menus": menu_id, "per_page": 100},
-    headers=HEADERS, timeout=10
-)
-
-if items_resp.status_code == 200:
-    old_items = items_resp.json()
-    print(f"  {len(old_items)}개 삭제 중...")
-    for item in old_items:
-        requests.delete(f"{API}/menu-items/{item['id']}?force=true", headers=HEADERS, timeout=10)
-    print(f"  삭제 완료")
-else:
-    print(f"  조회 실패: {items_resp.status_code}")
+for attempt in range(2):
+    items_resp = requests.get(
+        f"{API}/menu-items", params={"menus": menu_id, "per_page": 100},
+        headers=HEADERS, timeout=10
+    )
+    if items_resp.status_code == 200:
+        old_items = items_resp.json()
+        if not old_items:
+            print(f"  기존 아이템 없음 — 건너뜀")
+            break
+        print(f"  {len(old_items)}개 삭제 중... (시도 {attempt+1})")
+        for item in old_items:
+            del_resp = requests.delete(f"{API}/menu-items/{item['id']}?force=true", headers=HEADERS, timeout=10)
+            status = "OK" if del_resp.status_code in (200, 204) else f"ERR:{del_resp.status_code}"
+            print(f"    [{status}] id={item['id']} {item.get('title', {}).get('rendered', '')}")
+    else:
+        print(f"  조회 실패: {items_resp.status_code} — 메뉴 API 미지원일 수 있음")
+        break
+print("  삭제 완료")
 
 # ── 4. 새 메뉴 아이템 생성 ──
 print(f"\n=== 새 메뉴 생성 ===")
