@@ -1,4 +1,4 @@
-/* AutoBlog Custom Theme v2 — Performance-First */
+/* AutoBlog Custom Theme — Mobile-First */
 
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 
@@ -6,211 +6,167 @@
 
 body { background: #f8fafc !important; color: #1e293b; line-height: 1.7; }
 
-/* ── 상단 헤더 ── */
+/* 헤더 */
 .site-header, header#masthead {
-  background: linear-gradient(135deg, #1a1a2e 0%, #2d2b55 100%) !important;
-  border-bottom: none !important;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15) !important;
-  padding: 0 !important;
-}
-.site-branding {
-  padding: 28px 0 20px !important;
-  text-align: center;
+  background: #fff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
 }
 .site-title, .site-title a {
-  font-size: 26px !important; font-weight: 900 !important;
-  color: #ffffff !important; text-decoration: none !important;
-  letter-spacing: -0.5px;
+  font-size: 22px !important; font-weight: 800 !important;
+  color: #1a1a2e !important; text-decoration: none !important;
 }
-.site-description {
-  font-size: 13px !important; color: rgba(255,255,255,0.5) !important;
-  margin-top: 4px !important;
-}
+.site-description { font-size: 13px !important; color: #94a3b8 !important; }
 
-/* ── 네비게이션 메뉴 ── */
-.main-navigation, .primary-navigation, nav.primary-menu-container {
-  background: rgba(255,255,255,0.08) !important;
-  backdrop-filter: blur(8px);
-  border-top: 1px solid rgba(255,255,255,0.08);
+/* 네비게이션 */
+.main-navigation ul, .primary-navigation ul, .menu {
+  display: flex !important; gap: 4px !important; list-style: none !important;
+  padding: 0 !important; flex-wrap: wrap; justify-content: center;
 }
-.main-navigation ul, .primary-navigation ul {
-  display: flex !important; gap: 2px !important; list-style: none !important;
-  padding: 6px 0 !important; margin: 0 !important;
-  flex-wrap: wrap; justify-content: center;
-}
-.main-navigation li a, .primary-navigation li a, .wp-block-navigation-item a {
-  padding: 9px 20px !important; font-size: 13.5px !important; font-weight: 600 !important;
-  color: rgba(255,255,255,0.75) !important; text-decoration: none !important;
+.main-navigation li a, .primary-navigation li a, .wp-block-navigation-item a, .menu-item a {
+  padding: 10px 18px !important; font-size: 14px !important; font-weight: 600 !important;
+  color: #475569 !important; text-decoration: none !important;
   border-radius: 8px !important; transition: all 0.2s ease !important;
-  letter-spacing: 0.2px;
 }
-.main-navigation li a:hover, .primary-navigation li a:hover {
-  background: rgba(255,255,255,0.12) !important; color: #fff !important;
-}
-.main-navigation li.current-menu-item a, .primary-navigation li.current-menu-item a {
-  background: rgba(99,102,241,0.5) !important; color: #fff !important;
+.main-navigation li a:hover, .primary-navigation li a:hover, .menu-item a:hover { background: #f1f5f9 !important; color: #6366f1 !important; }
+.current-menu-item a { background: rgba(99,102,241,0.08) !important; color: #6366f1 !important; }
+
+/* 콘텐츠 영역 */
+.site-content, .content-area, main#main {
+  max-width: 1200px !important; margin: 0 auto !important; padding: 32px 16px !important;
 }
 
-/* ── 콘텐츠 영역 (넓게) ── */
-.site-content, .content-area, main#main,
-.site-main, #content {
-  max-width: 1400px !important; margin: 0 auto !important; padding: 36px 24px !important;
-  width: 100% !important; box-sizing: border-box !important;
-}
-.inside-article, .entry-content {
-  max-width: 100% !important; width: 100% !important;
-}
-.single .entry-content {
-  max-width: 860px !important; margin: 0 auto !important;
-}
-.container, .grid-container {
-  max-width: 1400px !important;
-}
-
-/* ── 카드 레이아웃 + 썸네일 ── */
+/* 카드 레이아웃 */
 .site-main > article, .hentry {
   background: #fff !important; border-radius: 16px !important;
-  border: 1px solid #e2e8f0 !important;
-  padding: 0 !important; margin-bottom: 24px !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
-  transition: all 0.25s ease !important;
-  overflow: hidden;
+  border: 1px solid #e2e8f0 !important; padding: 24px !important;
+  margin-bottom: 20px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+  transition: all 0.2s ease !important;
 }
 .site-main > article:hover, .hentry:hover {
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
-  transform: translateY(-3px);
-  border-color: #c7d2fe !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
+  transform: translateY(-2px);
 }
 
-/* 썸네일 이미지 */
-.post-image, .entry-image, .featured-image,
-article .post-image img, article .wp-post-image {
-  width: 100% !important; height: 220px !important;
-  object-fit: cover !important; border-radius: 0 !important;
-  display: block;
-}
-
-/* 카드 내 텍스트 영역 */
-.inside-article {
-  padding: 24px 28px 28px !important;
-}
-
-/* ── 글 제목 ── */
+/* 글 제목 */
 .entry-title, .entry-title a {
-  font-size: 19px !important; font-weight: 800 !important;
-  color: #1a1a2e !important; text-decoration: none !important;
-  line-height: 1.45 !important; letter-spacing: -0.3px;
-  display: -webkit-box; -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 20px !important; font-weight: 800 !important;
+  color: #1a1a2e !important; text-decoration: none !important; line-height: 1.4 !important;
 }
 .entry-title a:hover { color: #6366f1 !important; }
 
-/* 단일 글 제목 */
-.single .entry-title, .single .entry-title a {
-  font-size: 30px !important; text-align: left !important;
-  -webkit-line-clamp: unset; overflow: visible;
-  line-height: 1.35 !important; margin-bottom: 8px !important;
-}
-
-/* ── 메타 정보 ── */
-.entry-meta, .posted-on, .byline {
-  font-size: 12.5px !important; color: #94a3b8 !important;
-}
+/* 메타 */
+.entry-meta, .entry-meta a, .posted-on, .byline { font-size: 13px !important; color: #94a3b8 !important; }
 .entry-meta a { color: #6366f1 !important; text-decoration: none !important; font-weight: 600; }
-.entry-meta .cat-links { margin-bottom: 8px !important; display: block; }
+
+/* 발췌 */
+.entry-summary { font-size: 15px !important; color: #64748b !important; line-height: 1.7 !important; }
 
 /* 카테고리 배지 */
 .cat-links a {
-  display: inline-block; padding: 4px 12px !important;
-  background: linear-gradient(135deg, #6366f1, #818cf8) !important;
-  color: #fff !important; border-radius: 20px !important;
-  font-size: 11px !important; font-weight: 700 !important;
-  letter-spacing: 0.3px;
+  display: inline-block; padding: 3px 10px !important;
+  background: rgba(99,102,241,0.08) !important; color: #6366f1 !important;
+  border-radius: 6px !important; font-size: 11px !important; font-weight: 700 !important;
 }
 
-/* ── 발췌문 ── */
-.entry-summary, .entry-summary p {
-  font-size: 14.5px !important; color: #64748b !important;
-  line-height: 1.65 !important; margin-top: 10px !important;
-  display: -webkit-box; -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical; overflow: hidden;
-}
-
-/* ── 더 읽기 버튼 ── */
-.more-link, a.read-more {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 10px 22px !important; margin-top: 16px !important;
+/* 더 읽기 */
+.more-link {
+  display: inline-block; padding: 8px 20px !important;
   background: #6366f1 !important; color: #fff !important;
-  border-radius: 10px !important; font-size: 13px !important; font-weight: 700 !important;
+  border-radius: 8px !important; font-size: 13px !important; font-weight: 700 !important;
   text-decoration: none !important; transition: all 0.2s ease !important;
 }
-.more-link:hover, a.read-more:hover {
-  background: #4f46e5 !important; transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99,102,241,0.3) !important;
-}
+.more-link:hover { background: #4f46e5 !important; }
 
-/* ── 사이드바 위젯 ── */
-.widget-area { padding-top: 8px !important; }
+/* 단일 글 본문 */
+.single .entry-content { max-width: 100% !important; margin: 0 auto !important; padding: 0 8px !important; }
+.single .entry-title { font-size: 26px !important; }
+.single .entry-meta { margin-bottom: 24px !important; }
+.entry-content img { max-width: 100% !important; height: auto !important; border-radius: 8px !important; }
+.entry-content table { width: 100% !important; border-collapse: collapse; font-size: 14px !important; }
+.entry-content th, .entry-content td { padding: 10px 12px !important; border: 1px solid #e2e8f0 !important; }
+.entry-content th { background: #f8fafc !important; font-weight: 700 !important; }
+
+/* 사이드바 위젯 */
 .widget {
-  background: #fff !important; border-radius: 14px !important;
-  border: 1px solid #e2e8f0 !important; padding: 22px 24px !important;
-  margin-bottom: 16px !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+  background: #fff !important; border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important; padding: 24px !important; margin-bottom: 16px !important;
 }
 .widget-title {
   font-size: 14px !important; font-weight: 800 !important; color: #1a1a2e !important;
-  padding-bottom: 12px !important; margin-bottom: 14px !important;
-  border-bottom: 2px solid #eef2ff !important;
+  padding-bottom: 12px !important; border-bottom: 2px solid #f1f5f9 !important;
 }
 
-/* ── 푸터 ── */
+/* 푸터 */
 .site-footer, footer#colophon {
-  background: #1a1a2e !important; color: rgba(255,255,255,0.45) !important;
-  padding: 48px 20px !important; margin-top: 60px !important; text-align: center;
-  font-size: 13px !important;
+  background: #1a1a2e !important; color: #94a3b8 !important;
+  padding: 40px 20px !important; margin-top: 60px !important; text-align: center;
 }
 .site-footer a { color: #818cf8 !important; text-decoration: none !important; }
 
-/* ── 페이지네이션 ── */
-.nav-links {
-  display: flex !important; justify-content: center !important;
-  gap: 6px !important; margin: 48px 0 !important;
-}
+/* 페이지네이션 */
+.nav-links { display: flex !important; justify-content: center !important; gap: 8px !important; margin: 40px 0 !important; }
 .nav-links a, .nav-links span {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 42px; height: 42px; border-radius: 10px !important;
+  min-width: 40px; height: 40px; border-radius: 8px !important;
   font-size: 14px !important; font-weight: 600 !important; text-decoration: none !important;
 }
-.nav-links a {
-  background: #fff !important; color: #475569 !important;
-  border: 1px solid #e2e8f0 !important;
-}
-.nav-links a:hover { background: #eef2ff !important; color: #6366f1 !important; border-color: #c7d2fe !important; }
-.nav-links .current {
-  background: #6366f1 !important; color: #fff !important; border: none !important;
-  box-shadow: 0 2px 8px rgba(99,102,241,0.3) !important;
-}
+.nav-links a { background: #fff !important; color: #475569 !important; border: 1px solid #e2e8f0 !important; }
+.nav-links a:hover { background: #f1f5f9 !important; color: #6366f1 !important; }
+.nav-links .current { background: #6366f1 !important; color: #fff !important; border: none !important; }
 
-/* ── 검색 ── */
-.search-form { display: flex !important; gap: 8px !important; }
+/* 검색 */
 .search-field {
-  flex: 1; padding: 10px 16px !important; border: 1px solid #e2e8f0 !important;
-  border-radius: 10px !important; font-size: 14px !important;
+  padding: 10px 16px !important; border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important; font-size: 14px !important; width: 100% !important;
 }
 .search-field:focus { border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.1) !important; }
-.search-submit {
-  padding: 10px 20px !important; background: #6366f1 !important; color: #fff !important;
-  border: none !important; border-radius: 10px !important; font-weight: 700 !important;
+
+/* ── 모바일: 태블릿 ── */
+@media (max-width: 1024px) {
+  .site-content, .content-area, main#main { padding: 20px 12px !important; }
 }
 
-/* ── 반응형 ── */
+/* ── 모바일: 768px ── */
 @media (max-width: 768px) {
-  .site-content, .content-area { padding: 16px 12px !important; }
-  .site-main > article, .hentry { margin-bottom: 16px !important; }
-  .inside-article { padding: 18px 20px 22px !important; }
-  .entry-title, .entry-title a { font-size: 16.5px !important; }
-  .single .entry-title, .single .entry-title a { font-size: 23px !important; }
-  .main-navigation li a { padding: 8px 14px !important; font-size: 12.5px !important; }
-  .post-image img, .wp-post-image { height: 180px !important; }
-  .site-title, .site-title a { font-size: 20px !important; }
+  body { margin: 0 !important; }
+  .site-content, .content-area, main#main {
+    padding: 10px 6px !important; max-width: 100% !important;
+  }
+  .site-main > article, .hentry {
+    padding: 16px 12px !important; border-radius: 10px !important;
+    margin: 0 0 10px 0 !important;
+  }
+  .entry-title, .entry-title a { font-size: 17px !important; }
+  .single .entry-title { font-size: 21px !important; }
+  .single .entry-content { padding: 0 4px !important; font-size: 15px !important; line-height: 1.8 !important; }
+  .entry-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .main-navigation ul, .primary-navigation ul, .menu {
+    flex-wrap: nowrap !important; overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch; gap: 2px !important; padding: 4px 6px !important;
+  }
+  .main-navigation li a, .primary-navigation li a, .menu-item a {
+    padding: 8px 10px !important; font-size: 12px !important; white-space: nowrap !important;
+  }
+  .widget-area, #secondary { display: none !important; }
+  .entry-summary { font-size: 14px !important; }
+  .site-footer { padding: 20px 10px !important; margin-top: 24px !important; }
+  .more-link { padding: 8px 14px !important; font-size: 12px !important; }
+
+  /* GeneratePress 전용: 컨테이너 여백 제거 */
+  .grid-container, .inside-article, .paging-navigation {
+    padding-left: 6px !important; padding-right: 6px !important;
+  }
+  .site-header .inside-header { padding: 10px 8px !important; }
+}
+
+/* ── 모바일: 480px ── */
+@media (max-width: 480px) {
+  .site-content, .content-area, main#main { padding: 6px 2px !important; }
+  .site-main > article, .hentry { padding: 12px 10px !important; border-radius: 8px !important; }
+  .entry-title, .entry-title a { font-size: 15px !important; }
+  .single .entry-title { font-size: 19px !important; }
+  .single .entry-content { font-size: 14px !important; }
+  .site-title, .site-title a { font-size: 18px !important; }
+  .grid-container { padding-left: 2px !important; padding-right: 2px !important; }
 }

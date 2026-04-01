@@ -60,8 +60,33 @@ if menus_resp.status_code == 200:
             menu_id = m['id']
 
 if not menu_id:
-    print("  메뉴를 찾을 수 없습니다.")
-    sys.exit(1)
+    print("  메뉴가 없습니다. 새 메뉴 생성 중...")
+    create_resp = requests.post(
+        f"{API}/menus",
+        headers=HEADERS,
+        json={"name": "Main Menu", "slug": "main-menu"},
+        timeout=10
+    )
+    if create_resp.status_code in (200, 201):
+        menu_id = create_resp.json().get("id")
+        print(f"  [NEW] Main Menu 생성 (id={menu_id})")
+    else:
+        print(f"  메뉴 생성 실패: {create_resp.status_code} {create_resp.text[:200]}")
+        # 폴백: Navigation Menus REST API가 없는 경우 (테마에 따라 다름)
+        # wp-json/wp/v2/menus 대신 wp-json/wp/v2/navigation 시도
+        nav_resp = requests.post(
+            f"{API}/navigation",
+            headers=HEADERS,
+            json={"title": "Main Menu", "slug": "main-menu", "status": "publish"},
+            timeout=10
+        )
+        if nav_resp.status_code in (200, 201):
+            menu_id = nav_resp.json().get("id")
+            print(f"  [NEW] Navigation 블록 생성 (id={menu_id})")
+        else:
+            print(f"  메뉴/네비게이션 생성 모두 실패")
+            print(f"  WP Admin > 외모 > 메뉴 에서 수동으로 'Main Menu'를 생성해주세요")
+            sys.exit(1)
 
 print(f"  사용할 메뉴: ID={menu_id}")
 

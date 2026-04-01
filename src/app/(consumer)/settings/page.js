@@ -16,8 +16,10 @@ const SETUP_ACTIONS = [
     desc: 'About, Privacy Policy, 자기소개 등 AdSense 필수 페이지',
     icon: '\uD83D\uDCC4', successMsg: '필수 페이지 생성 완료!' },
   { id: 'inject-css', step: 3, label: 'CSS 디자인 적용',
-    desc: '모바일 반응형 + 블로그 테마 스타일링 자동 적용',
-    icon: '\uD83C\uDFA8', successMsg: 'CSS 적용 완료!' },
+    desc: '모바일 반응형 + 블로그 테마 스타일링',
+    icon: '\uD83C\uDFA8', successMsg: 'CSS 적용 완료!',
+    manualNote: 'WP Admin > 외모 > 추가 CSS에 붙여넣기가 필요할 수 있습니다',
+    cssUrl: 'https://raw.githubusercontent.com/planxs-ai/wp-auto/main/scripts/custom_theme.css' },
   { id: 'publish', step: 4, label: '첫 글 발행',
     desc: 'AI가 선택한 니치로 글을 작성하여 발행',
     icon: '\uD83D\uDCDD', successMsg: '발행 시작!' },
@@ -631,6 +633,24 @@ export default function SettingsPage() {
                         ? `\u274C ${logEntry?.error || '실패'}`
                         : action.desc}
                   </div>
+                  {action.cssUrl && (
+                    <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 3 }}>
+                      {action.manualNote}{' '}
+                      <a href={action.cssUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+                        CSS 다운로드
+                      </a>
+                      {site?.domain && (
+                        <>
+                          {' | '}
+                          <a href={`https://${site.domain}/wp-admin/customize.php`} target="_blank" rel="noopener noreferrer"
+                            style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+                            추가 CSS 열기
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   {/* Post count selector for publish action */}
