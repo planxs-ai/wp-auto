@@ -10,17 +10,45 @@ import os, sys, base64, json
 WP_URL = os.environ.get("WP_URL", "").rstrip("/")
 WP_USER = os.environ.get("WP_USERNAME", "")
 WP_PASS = os.environ.get("WP_APP_PASSWORD", "")
-
-# Optional: from dashboard_config or env
-BLOG_OWNER = os.environ.get("BLOG_OWNER", "블로그 운영자")
-BLOG_DESC = os.environ.get("BLOG_DESC", "유용한 정보를 공유하는 블로그입니다")
-CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "contact@example.com")
+SITE_ID = os.environ.get("SITE_ID", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
 if not all([WP_URL, WP_USER, WP_PASS]):
     print("ERROR: WP_URL, WP_USERNAME, WP_APP_PASSWORD 환경변수 필요")
     sys.exit(1)
 
 import requests
+
+# ── Supabase에서 기본정보 로드 (dashboard_config) ──
+BLOG_OWNER = os.environ.get("BLOG_OWNER", "")
+BLOG_DESC = os.environ.get("BLOG_DESC", "")
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
+
+if SUPABASE_URL and SUPABASE_KEY and SITE_ID:
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/dashboard_config?site_id=eq.{SITE_ID}&select=config",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+            timeout=10
+        )
+        rows = resp.json()
+        if rows and len(rows) > 0:
+            cfg = rows[0].get("config", {})
+            BLOG_OWNER = cfg.get("blog_owner", "") or BLOG_OWNER
+            BLOG_DESC = cfg.get("blog_desc", "") or BLOG_DESC
+            CONTACT_EMAIL = cfg.get("contact_email", "") or CONTACT_EMAIL
+            print(f"  Supabase에서 기본정보 로드 완료 (site_id={SITE_ID})")
+    except Exception as e:
+        print(f"  Supabase 조회 실패: {e} — 환경변수 폴백 사용")
+
+# 최종 폴백
+if not BLOG_OWNER:
+    BLOG_OWNER = "블로그 운영자"
+if not BLOG_DESC:
+    BLOG_DESC = "유용한 정보를 공유하는 블로그입니다"
+if not CONTACT_EMAIL:
+    CONTACT_EMAIL = "contact@example.com"
 
 cred = base64.b64encode(f"{WP_USER}:{WP_PASS}".encode()).decode()
 HEADERS = {

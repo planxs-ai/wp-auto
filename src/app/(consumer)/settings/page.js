@@ -80,21 +80,24 @@ export default function SettingsPage() {
           setConfig(data.config);
           setSelectedCats(data.config.niches || []);
           setSetupLog(data.config.setup_log || []);
-          // Schedule
-          const dc = data.config.daily_count || 2;
-          setDailyCount(dc);
-          setScheduleTimes(data.config.schedule_times || DEFAULT_TIMES.slice(0, dc));
-          if (data.config.first_post_count) setFirstPostCount(data.config.first_post_count);
-          if (data.config.blog_owner) setBlogOwner(data.config.blog_owner);
-          if (data.config.blog_desc) setBlogDesc(data.config.blog_desc);
-          if (data.config.contact_email) setContactEmail(data.config.contact_email);
+          setDailyCount(data.config.daily_count || 2);
+          setScheduleTimes(data.config.schedule_times || DEFAULT_TIMES.slice(0, data.config.daily_count || 2));
+          setFirstPostCount(data.config.first_post_count || 3);
+          setBlogOwner(data.config.blog_owner || '');
+          setBlogDesc(data.config.blog_desc || '');
+          setContactEmail(data.config.contact_email || '');
         } else {
           setConfig(null);
           setSelectedCats([]);
           setSetupLog([]);
           setDailyCount(2);
           setScheduleTimes(['07:00', '18:00']);
+          setFirstPostCount(3);
+          setBlogOwner('');
+          setBlogDesc('');
+          setContactEmail('');
         }
+        setSetupRunning({});
       });
   }, [site?.id]);
 
