@@ -392,24 +392,31 @@ export default function SettingsPage() {
         </div>
       </Card>
 
-      {/* ── STEP 1: Site Connection — connected = inline bar, not a card ── */}
+      {/* ── STEP 1: Site Connection ── */}
       {site && siteMode === 'view' ? (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          marginBottom: 20, padding: '10px 16px', borderRadius: 10,
-          background: 'var(--green-bg)', border: '1px solid rgba(16,185,129,0.15)',
-        }}>
-          <StepBadge num={1} done={true} />
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {site.domain || site.name}
+        /* Connected: locked inline bar */
+        <div style={{ marginBottom: 20 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 16px', borderRadius: 10,
+            background: 'var(--green-bg)', border: '1px solid rgba(16,185,129,0.15)',
+            opacity: 0.85,
+          }}>
+            <StepBadge num={1} done={true} />
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', flexShrink: 0 }}>STEP 1</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {site.domain || site.name}
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--green)', flexShrink: 0 }}>
+              {'\u2705'} 연결됨
+            </span>
           </div>
-          <span style={{ fontSize: 11, color: 'var(--green)', flexShrink: 0 }}>
-            {'\u2705'} 연결됨
-          </span>
-          <button onClick={startEdit}
-            style={{ border: 'none', background: 'none', color: 'var(--text-dim)', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
-            변경
-          </button>
+          <div style={{ textAlign: 'right', marginTop: 4 }}>
+            <button onClick={startEdit}
+              style={{ border: 'none', background: 'none', color: 'var(--text-dim)', fontSize: 10, cursor: 'pointer', textDecoration: 'underline' }}>
+              사이트 정보 변경
+            </button>
+          </div>
         </div>
       ) : (
       <Card style={{ marginBottom: 20 }}>
