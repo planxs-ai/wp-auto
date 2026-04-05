@@ -19,6 +19,10 @@ on:
         description: '니치/카테고리 필터 (빈값=전체)'
         required: false
         default: ''
+      site_id:
+        description: 'Site ID (빈값=전체 관리 사이트)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -27,6 +31,11 @@ jobs:
   golden-publish:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ${{ inputs.site_id != '' && fromJson(format('["{0}"]', inputs.site_id)) || fromJson('["site-1","site-2","site-3"]') }}
 
     env:
       WP_URL: ${{ secrets.WP_URL }}
@@ -49,7 +58,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-      SITE_ID: site-1
+      SITE_ID: ${{ matrix.site }}
 
     steps:
       - name: Checkout
@@ -65,7 +74,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Golden AutoBlog (고품질 모드)
+      - name: Run Golden AutoBlog (${{ matrix.site }})
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             COUNT="${{ github.event.inputs.count || '2' }}"
@@ -77,7 +86,7 @@ jobs:
             NICHE=""
           fi
 
-          ARGS="--all-sites --count $COUNT --pipeline autoblog --golden"
+          ARGS="--site-id ${{ matrix.site }} --count $COUNT --pipeline autoblog --golden"
           if [ "$DRY_RUN" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
@@ -88,13 +97,13 @@ jobs:
           python scripts/main.py $ARGS
 
       # ETF 리포트는 etf-report.yml (KST 16:30)에서 단독 실행
-      # 중복 방지를 위해 여기서는 제거됨
 
       - name: Commit used keywords
         if: always()
         run: |
           git config user.email "bot@autoblog.com"
           git config user.name "AutoBlog Bot"
+          git pull --rebase || true
           git add data/used_keywords.json || true
-          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d) [golden]"
+          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d) [golden/${{ matrix.site }}]"
           git push || true

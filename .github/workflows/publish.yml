@@ -1,4 +1,4 @@
-name: AutoBlog Publish (Consumer)
+name: AutoBlog Publish (Per-Site)
 
 on:
   schedule:
@@ -25,18 +25,10 @@ on:
         description: '니치/카테고리 필터 (빈값=전체)'
         required: false
         default: ''
-      wp_url:
-        description: 'WordPress URL (from dashboard)'
-        required: false
-      wp_username:
-        description: 'WP username (from dashboard)'
-        required: false
-      wp_app_password:
-        description: 'WP app password (from dashboard)'
-        required: false
       site_id:
-        description: 'Site ID (from dashboard)'
+        description: 'Site ID (빈값=전체 관리 사이트)'
         required: false
+        default: ''
 
 permissions:
   contents: write
@@ -46,11 +38,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ${{ inputs.site_id != '' && fromJson(format('["{0}"]', inputs.site_id)) || fromJson('["site-1","site-2","site-3"]') }}
+
     env:
-      WP_URL: ${{ inputs.wp_url || secrets.WP_URL }}
-      WP_USERNAME: ${{ inputs.wp_username || secrets.WP_USERNAME }}
-      WP_APP_PASSWORD: ${{ inputs.wp_app_password || secrets.WP_APP_PASSWORD }}
-      FORCE_RUN: ${{ inputs.wp_url && 'true' || 'false' }}
+      WP_URL: ${{ secrets.WP_URL }}
+      WP_USERNAME: ${{ secrets.WP_USERNAME }}
+      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
       GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
@@ -68,7 +64,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-      SITE_ID: ${{ inputs.site_id || 'site-1' }}
+      SITE_ID: ${{ matrix.site }}
 
     steps:
       - name: Checkout
@@ -84,33 +80,26 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run AutoBlog Engine
+      - name: Run AutoBlog Engine (${{ matrix.site }})
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # 수동 실행: 입력값 사용
             COUNT="${{ github.event.inputs.count || '3' }}"
             DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
             PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
             NICHE="${{ github.event.inputs.niche || '' }}"
           else
-            # 자동 스케줄: 1편씩 분산 발행
             COUNT="1"
             DRY_RUN="false"
             PIPELINE="autoblog"
             NICHE=""
           fi
 
-          ARGS="--count $COUNT --pipeline $PIPELINE --golden"
+          ARGS="--site-id ${{ matrix.site }} --count $COUNT --pipeline $PIPELINE --golden"
           if [ "$DRY_RUN" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
           if [ -n "$NICHE" ]; then
             ARGS="$ARGS --niche $NICHE"
-          fi
-
-          # Supabase 연결 시 멀티사이트, 없으면 환경변수 단일 사이트
-          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_KEY" ]; then
-            ARGS="--all-sites $ARGS"
           fi
 
           python scripts/main.py $ARGS
@@ -120,6 +109,7 @@ jobs:
         run: |
           git config user.email "bot@autoblog.com"
           git config user.name "AutoBlog Bot"
+          git pull --rebase || true
           git add data/used_keywords.json || true
-          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d)"
+          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d) [${{ matrix.site }}]"
           git push || true

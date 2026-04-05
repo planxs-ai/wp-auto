@@ -2044,7 +2044,7 @@ function SettingsTab({ siteId, sites }) {
             </div>
           </div>
           <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.06)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.12)' }}>
-            멀티사이트 모드: 사이트별 WP 인증정보가 여기에 저장됩니다. GitHub Secrets의 WP 인증정보는 폴백으로 사용됩니다.
+            사이트별 개별 실행: WP 인증정보가 여기에 저장됩니다. GitHub Secrets는 폴백으로 사용됩니다.
           </div>
           <div>
             <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6, fontWeight: 500 }}>일일 발행 목표</label>

@@ -48,6 +48,21 @@ CATEGORY_KEYWORDS = {
 # 비공개 대상 카테고리
 DRAFT_CATEGORIES = ["블로그 자동화", "쿠팡 핫딜", "쿠팡 뷰티/미용", "쿠팡 생활/주방"]
 
+# 카테고리 통합 매핑 (기존 분산 카테고리 → 핵심 5개로)
+CATEGORY_MERGE = {
+    "재테크 입문": "재테크 기초",
+    "적금·예금": "재테크 기초",
+    "AI 투자": "주식·투자",
+    "주식·배당": "주식·투자",
+    "ETF·인덱스": "주식·투자",
+    "절세·세금": "절세·세금",
+    "부동산": "부동산·연금",
+    "연금·노후": "부동산·연금",
+    "생활정보": "생활 꿀팁",
+    "IT/전자": "생활 꿀팁",
+    "건강": "생활 꿀팁",
+}
+
 
 def get_all_categories():
     """모든 카테고리 조회"""
@@ -118,6 +133,131 @@ def clean_html_document_tags(content):
     content = re.sub(r'</?body[^>]*>', '', content, flags=re.IGNORECASE)
     content = re.sub(r'<meta[^>]*/?>', '', content, flags=re.IGNORECASE)
     return content
+
+
+def clean_inline_css(content):
+    """본문 내 인라인 <style> 블록 제거 (AdSense 품질 신호 개선)"""
+    # AutoBlog이 주입한 <style> 블록
+    content = re.sub(
+        r'\s*<style>\s*/\*\s*AutoBlog\s.*?\*/.*?</style>\s*',
+        '', content, flags=re.DOTALL | re.IGNORECASE
+    )
+    # 본문 상단 일반 <style> 블록
+    if content.lstrip().startswith('<style'):
+        content = re.sub(
+            r'^\s*<style[^>]*>.*?</style>\s*',
+            '', content, count=1, flags=re.DOTALL | re.IGNORECASE
+        )
+    return content.lstrip('\n')
+
+
+def create_contact_page(site_name="신줌AI"):
+    """연락처 페이지 생성"""
+    resp = requests.get(f"{API}/pages?slug=contact&_fields=id", headers=HEADERS, timeout=10)
+    if resp.json():
+        print("연락처(Contact) 페이지 이미 존재 — 스킵")
+        return
+
+    contact_content = f"""
+<h2>문의하기</h2>
+<p>{site_name}에 대한 문의, 제안, 또는 수정 요청이 있으시면 아래 이메일로 연락해주세요.</p>
+
+<h3>이메일</h3>
+<p>📧 <strong>planxsol@gmail.com</strong></p>
+
+<h3>응답 안내</h3>
+<p>문의하신 내용은 영업일 기준 1~2일 이내에 답변드립니다.
+광고, 협찬, 콘텐츠 제휴 관련 문의도 환영합니다.</p>
+
+<h3>콘텐츠 수정 요청</h3>
+<p>게시된 글에 사실과 다른 정보가 있거나 수정이 필요한 경우,
+해당 글 URL과 함께 수정 요청 내용을 보내주시면 빠르게 반영하겠습니다.</p>
+"""
+    resp = requests.post(f"{API}/pages", headers=HEADERS, json={
+        "title": "문의하기",
+        "content": contact_content,
+        "status": "publish",
+        "slug": "contact",
+    }, timeout=15)
+
+    if resp.status_code in (200, 201):
+        print(f"연락처(Contact) 페이지 생성 완료: {WP_URL}/contact/")
+    else:
+        print(f"연락처 페이지 생성 실패: {resp.status_code}")
+
+
+def create_privacy_page(site_name="신줌AI"):
+    """개인정보처리방침 페이지 생성"""
+    resp = requests.get(f"{API}/pages?slug=privacy-policy&_fields=id", headers=HEADERS, timeout=10)
+    if resp.json():
+        print("개인정보처리방침 페이지 이미 존재 — 스킵")
+        return
+
+    privacy_content = f"""
+<h2>개인정보처리방침</h2>
+<p><strong>{site_name}</strong>(이하 "사이트")는 이용자의 개인정보를 중요시하며,
+「개인정보 보호법」을 준수하고 있습니다.</p>
+
+<h3>1. 수집하는 개인정보 항목</h3>
+<p>사이트는 서비스 제공을 위해 최소한의 개인정보를 수집합니다.</p>
+<p>자동 수집 항목: 접속 IP, 쿠키, 방문 일시, 서비스 이용 기록</p>
+
+<h3>2. 개인정보의 수집 및 이용 목적</h3>
+<p>수집된 정보는 콘텐츠 제공, 서비스 개선, 통계 분석 목적으로만 활용됩니다.</p>
+
+<h3>3. 개인정보의 보유 및 이용 기간</h3>
+<p>이용 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다.</p>
+
+<h3>4. 광고 및 제3자 서비스</h3>
+<p>사이트는 Google AdSense, 쿠팡 파트너스 등 제3자 광고 서비스를 이용할 수 있으며,
+이들 서비스는 자체적인 개인정보처리방침에 따라 쿠키를 사용할 수 있습니다.</p>
+<p>Google의 개인정보처리방침: <a href="https://policies.google.com/privacy" target="_blank">https://policies.google.com/privacy</a></p>
+
+<h3>5. 개인정보 보호책임자</h3>
+<p>이메일: planxsol@gmail.com</p>
+
+<h3>6. 방침 변경 안내</h3>
+<p>본 방침은 시행일로부터 적용되며, 변경 시 사이트를 통해 공지합니다.</p>
+<p><em>시행일: 2026년 4월 5일</em></p>
+"""
+    resp = requests.post(f"{API}/pages", headers=HEADERS, json={
+        "title": "개인정보처리방침",
+        "content": privacy_content,
+        "status": "publish",
+        "slug": "privacy-policy",
+    }, timeout=15)
+
+    if resp.status_code in (200, 201):
+        print(f"개인정보처리방침 페이지 생성 완료: {WP_URL}/privacy-policy/")
+    else:
+        print(f"개인정보처리방침 페이지 생성 실패: {resp.status_code}")
+
+
+def merge_categories(cats):
+    """분산된 카테고리를 핵심 5개로 통합"""
+    print("\n[5/6] 카테고리 통합 (11개 → 5개)")
+    merged_count = 0
+
+    for old_name, new_name in CATEGORY_MERGE.items():
+        if old_name not in cats or old_name == new_name:
+            continue
+
+        old_id = cats[old_name]
+        new_id = get_or_create_category(new_name, cats)
+        if not new_id:
+            continue
+
+        # 이전 카테고리의 글들을 새 카테고리로 이동
+        posts = get_posts_by_category(old_id)
+        for p in posts:
+            current_cats = [c for c in (p.get("categories") or []) if c != old_id]
+            current_cats.append(new_id)
+            if update_post(p["id"], {"categories": list(set(current_cats))}):
+                merged_count += 1
+
+        print(f"  {old_name} → {new_name}: {len(posts)}편 이동")
+
+    print(f"  → {merged_count}편 카테고리 통합 완료")
 
 
 def update_post(post_id, data):
@@ -211,9 +351,10 @@ def main():
                     print(f"  재분류: [{p['id']}] {title[:35]} → {new_cat_name}")
         print(f"  → {reclassified}편 재분류 완료")
 
-    # ─── 3. HTML 깨진 글 수정 ───
-    print("\n[3/4] HTML 문서 태그 정리")
+    # ─── 3. HTML 깨진 글 수정 + 인라인 CSS 제거 ───
+    print("\n[3/6] HTML 문서 태그 + 인라인 CSS 정리")
     fixed_count = 0
+    css_count = 0
     page = 1
     while True:
         resp = requests.get(
@@ -227,35 +368,60 @@ def main():
             break
         for p in posts:
             content = p["content"]["rendered"]
+            needs_fix = False
+
+            # 원본 content 가져오기
+            raw_resp = requests.get(
+                f"{API}/posts/{p['id']}?context=edit&_fields=content",
+                headers=HEADERS, timeout=15
+            )
+            if raw_resp.status_code != 200:
+                continue
+
+            raw_content = raw_resp.json()["content"]["raw"]
+            cleaned = raw_content
+
+            # HTML 문서 태그 제거
             if "<!DOCTYPE" in content or "<html" in content or "<body" in content:
-                # 원본 content 가져오기 (rendered가 아닌 raw)
-                raw_resp = requests.get(
-                    f"{API}/posts/{p['id']}?context=edit&_fields=content",
-                    headers=HEADERS, timeout=15
-                )
-                if raw_resp.status_code == 200:
-                    raw_content = raw_resp.json()["content"]["raw"]
-                    cleaned = clean_html_document_tags(raw_content)
-                    if cleaned != raw_content:
-                        if update_post(p["id"], {"content": cleaned}):
-                            fixed_count += 1
-                            print(f"  HTML 수정: [{p['id']}] {p['title']['rendered'][:40]}")
+                cleaned = clean_html_document_tags(cleaned)
+                needs_fix = True
+
+            # 인라인 CSS 제거
+            if "<style" in cleaned[:500]:
+                cleaned = clean_inline_css(cleaned)
+                needs_fix = True
+                css_count += 1
+
+            if needs_fix and cleaned != raw_content:
+                if update_post(p["id"], {"content": cleaned}):
+                    fixed_count += 1
+                    print(f"  수정: [{p['id']}] {p['title']['rendered'][:40]}")
+
         if len(posts) < 50:
             break
         page += 1
-    print(f"  → {fixed_count}편 HTML 수정 완료")
+    print(f"  → {fixed_count}편 수정 완료 (HTML {fixed_count - css_count}, CSS {css_count})")
 
     # ─── 4. 소개(About) 페이지 생성 ───
-    print("\n[4/4] 소개(About) 페이지 확인/생성")
+    print("\n[4/6] 소개(About) 페이지 확인/생성")
     create_about_page()
+
+    # ─── 5. 연락처 + 개인정보처리방침 페이지 ───
+    print("\n[5/6] 연락처 + 개인정보처리방침 페이지")
+    create_contact_page()
+    create_privacy_page()
+
+    # ─── 6. 카테고리 통합 ───
+    merge_categories(cats)
 
     # ─── 결과 요약 ───
     print("\n" + "=" * 60)
     print("정리 완료!")
     print(f"  비공개 처리: {draft_count}편")
     print(f"  카테고리 재분류: {reclassified if uncat_id else 0}편")
-    print(f"  HTML 수정: {fixed_count}편")
-    print(f"  소개 페이지: 확인 완료")
+    print(f"  HTML/CSS 수정: {fixed_count}편")
+    print(f"  필수 페이지: About + Contact + Privacy Policy 확인")
+    print(f"  카테고리 통합: 11개 → 5개")
     print("=" * 60)
     print("\n다음 단계: 애드센스 재심사 요청")
 

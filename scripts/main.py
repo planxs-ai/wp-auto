@@ -1641,29 +1641,85 @@ class ImageManager:
                 result["alt"] = keyword
                 return result
 
+        # 최종 폴백: Lorem Picsum (API 키 불필요, 항상 작동)
+        result = self._fetch_picsum()
+        if result:
+            result["alt"] = keyword
+            return result
+
         log.warning(f"모든 이미지 API 실패: {keyword} (en: {en_query})")
+        return None
+
+    def _fetch_picsum(self):
+        """Lorem Picsum — API 키 불필요 무료 이미지 (최종 폴백)"""
+        import requests
+        try:
+            log.info("  Picsum 이미지 폴백 중...")
+            seed = random.randint(1, 1000)
+            url = f"https://picsum.photos/seed/{seed}/1200/630"
+            resp = requests.head(url, allow_redirects=True, timeout=10)
+            if resp.status_code == 200:
+                final_url = resp.url
+                log.info(f"  Picsum 이미지 확보: seed={seed}")
+                return {
+                    "url": final_url,
+                    "credit": "Lorem Picsum",
+                    "credit_url": "https://picsum.photos",
+                    "source": "picsum",
+                }
+        except Exception as e:
+            log.warning(f"  Picsum 이미지 실패: {e}")
         return None
 
     def fetch_multiple(self, keyword, count=3, category=""):
         """여러 장의 이미지를 가져와 분산 삽입용으로 반환"""
         en_query = self._to_english_query(keyword, category)
+        log.info(f"  이미지 배치 검색: '{keyword}' → '{en_query}' (목표 {count}장)")
+        log.info(f"  API 키 상태: Pexels={'O' if PEXELS_KEY else 'X'} | Pixabay={'O' if PIXABAY_KEY else 'X'} | Unsplash={'O' if UNSPLASH_KEY else 'X'}")
         images = []
 
-        # Pexels에서 여러 장 가져오기
+        # 1순위: Pexels에서 여러 장 가져오기
         if PEXELS_KEY:
             batch = self._fetch_pexels_batch(en_query, count)
             images.extend(batch)
+            log.info(f"  Pexels: {len(batch)}장 확보")
+        else:
+            log.warning("  Pexels API 키 없음 — 스킵")
 
-        # 부족하면 Pixabay에서 보충
+        # 2순위: Pixabay에서 보충
         if len(images) < count and PIXABAY_KEY:
             batch = self._fetch_pixabay_batch(en_query, count - len(images))
             images.extend(batch)
+            log.info(f"  Pixabay: {len(batch)}장 추가 (누적 {len(images)}장)")
+        elif len(images) < count:
+            log.warning("  Pixabay API 키 없음 — 스킵")
+
+        # 3순위: Unsplash 개별 가져오기
+        if len(images) < count and UNSPLASH_KEY:
+            for _ in range(count - len(images)):
+                result = self._fetch_unsplash(en_query)
+                if result:
+                    images.append(result)
+            log.info(f"  Unsplash 보충 후 누적: {len(images)}장")
+        elif len(images) < count:
+            log.warning("  Unsplash API 키 없음 — 스킵")
+
+        # 최종 폴백: Picsum (API 키 불필요, 항상 작동)
+        if len(images) < count:
+            log.info(f"  API 이미지 부족 ({len(images)}/{count}) → Picsum 폴백 시작")
+        while len(images) < count:
+            result = self._fetch_picsum()
+            if result:
+                result["alt"] = keyword
+                images.append(result)
+            else:
+                break
 
         # alt 태그를 한국어 키워드로 설정
         for img in images:
             img["alt"] = keyword
 
-        log.info(f"  이미지 {len(images)}장 확보 (목표: {count}장)")
+        log.info(f"  이미지 최종 {len(images)}장 확보 (목표: {count}장)")
         return images
 
     def _fetch_pexels(self, query):
@@ -1975,9 +2031,9 @@ INLINE_MOBILE_CSS = """<style>
 .entry-content img { max-width: 100% !important; height: auto !important; border-radius: 8px; }
 .entry-content table { width: 100% !important; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; border-collapse: collapse; font-size: 14px; }
 .entry-content th, .entry-content td { padding: 10px 12px; border: 1px solid #e2e8f0; }
-.entry-content th { font-weight: 700; }
-.entry-content thead th { color: #fff !important; }
-.entry-content table:not([style*="box-shadow"]) th { background: #f8fafc; color: #1a1a2e; }
+.entry-content th { font-weight: 700; color: #1a1a2e; }
+.entry-content thead th { background: #6366f1; color: #fff !important; }
+.entry-content table[style*="box-shadow"] thead th { background: none; }
 .entry-content blockquote { margin: 16px 0; padding: 16px 20px; border-left: 4px solid #6366f1; background: #f8fafc; border-radius: 0 8px 8px 0; }
 .entry-content .tip-box { padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; margin: 16px 0; }
 .entry-content .key-point { padding: 16px; background: #fefce8; border: 1px solid #fde68a; border-radius: 10px; margin: 16px 0; }
@@ -2131,13 +2187,20 @@ class WordPressPublisher:
         "IT & 테크 리뷰": "tech-review",
         "정부지원 & 절세": "gov-support",
         "생활 경제": "life-economy",
+        # bomissu.com 생활경제 카테고리
+        "정부지원·복지": "gov-support",
+        "절세·세금": "tax-saving",
+        "부업·수익화": "side-income",
+        "보험·금융": "insurance-finance",
+        "생활비·살림": "living-cost",
     }
 
     def _get_or_create_category(self, name):
         import requests, html as _html
         try:
-            # 1순위: slug 기반 조회 (& 문자 안전)
             slug = self._CAT_SLUG_MAP.get(name)
+
+            # 1순위: slug 기반 조회 (& 문자 안전)
             if slug:
                 resp = requests.get(f"{self.url}/wp-json/wp/v2/categories",
                                    headers=self.headers, params={"slug": slug}, timeout=10)
@@ -2150,9 +2213,18 @@ class WordPressPublisher:
                                headers=self.headers, params={"search": name, "per_page": 5}, timeout=10)
             for c in resp.json():
                 if _html.unescape(c["name"]).lower() == name.lower():
-                    return c["id"]
+                    cat_id = c["id"]
+                    # 한국어 slug → 영문 slug 자동 교정
+                    if slug and c.get("slug", "").startswith("%"):
+                        try:
+                            requests.post(f"{self.url}/wp-json/wp/v2/categories/{cat_id}",
+                                         headers=self.headers, json={"slug": slug}, timeout=10)
+                            log.info(f"  카테고리 slug 교정: {name} → {slug}")
+                        except Exception:
+                            pass
+                    return cat_id
 
-            # 3순위: 새로 생성
+            # 3순위: 새로 생성 (항상 영문 slug 포함)
             create_data = {"name": name}
             if slug:
                 create_data["slug"] = slug
@@ -3761,49 +3833,6 @@ def _git_commit_used():
 
 
 # ═══════════════════════════════════════════════════════
-# 멀티사이트 실행
-# ═══════════════════════════════════════════════════════
-def run_all_sites(count=5, dry_run=False, pipeline="autoblog", adsense_mode=False, golden_mode=False, cli_draft_model="", cli_polish_model=""):
-    """Supabase에서 모든 active 사이트를 조회하고 순차적으로 파이프라인 실행"""
-    check_api_status()
-
-    sites = _get_all_active_sites()
-    if not sites:
-        log.error("active 상태인 사이트가 없습니다.")
-        return
-
-    log.info("=" * 60)
-    log.info(f"멀티사이트 모드 — {len(sites)}개 사이트")
-    for s in sites:
-        log.info(f"  [{s['id']}] {s.get('name', '?')} ({s.get('domain', '?')})")
-    log.info("=" * 60)
-
-    for site in sites:
-        cfg = site.get("config") or {}
-        wp_url = site.get("wp_url", "") or WP_URL
-        wp_user = cfg.get("wp_username", "") or WP_USER
-        wp_pass = cfg.get("wp_app_password", "") or WP_PASS
-
-        if not wp_url or not wp_user or not wp_pass:
-            log.warning(f"[{site['id']}] WP 인증정보 미설정 — 스킵")
-            log.warning(f"  대시보드 설정 탭에서 WP URL/인증정보를 입력하거나 환경변수를 설정하세요")
-            continue
-
-        log.info(f"\n{'#'*60}")
-        log.info(f"# 사이트: [{site['id']}] {site.get('name', '')}")
-        log.info(f"{'#'*60}")
-
-        try:
-            run_pipeline(count=count, dry_run=dry_run, pipeline=pipeline, site_override=site, adsense_mode=adsense_mode, golden_mode=golden_mode, cli_draft_model=cli_draft_model, cli_polish_model=cli_polish_model)
-        except Exception as e:
-            log.error(f"[{site['id']}] 파이프라인 오류: {e}")
-
-    _git_commit_used()
-    log.info(f"\n{'='*60}")
-    log.info(f"멀티사이트 실행 완료 — {len(sites)}개 사이트 처리")
-    log.info(f"{'='*60}")
-
-
 # ═══════════════════════════════════════════════════════
 # CLI
 # ═══════════════════════════════════════════════════════
@@ -3812,7 +3841,6 @@ def main():
     parser.add_argument("--count", type=int, default=5, help="발행 편수 (사이트별)")
     parser.add_argument("--dry-run", action="store_true", help="발행 없이 테스트")
     parser.add_argument("--pipeline", default="autoblog", help="파이프라인 (autoblog/hotdeal/promo)")
-    parser.add_argument("--all-sites", action="store_true", help="Supabase 등록된 모든 active 사이트에 발행")
     parser.add_argument("--adsense-mode", action="store_true", help="AdSense 승인용 고품질 모드 (85점+, 재생성)")
     parser.add_argument("--site-id", default="", help="특정 사이트 ID 지정 (기본: SITE_ID 환경변수)")
     parser.add_argument("--setup-pages", action="store_true", help="AdSense 필수 페이지 자동 생성")
@@ -3851,13 +3879,6 @@ def main():
         run_etf_report(report_type="blog-ready", dry_run=args.dry_run)
         return
 
-    # 멀티사이트 모드
-    if args.all_sites:
-        run_all_sites(count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
-                      adsense_mode=args.adsense_mode, golden_mode=args.golden,
-                      cli_draft_model=args.draft_model, cli_polish_model=args.polish_model)
-        return
-
     # 특정 사이트 지정
     if args.site_id:
         global SITE_ID
@@ -3874,7 +3895,7 @@ def main():
 
     # 단일 사이트 모드 (환경변수 기반)
     if not WP_URL:
-        log.error("WP_URL 환경변수 없음. --all-sites 또는 --site-id를 사용하세요.")
+        log.error("WP_URL 환경변수 없음. --site-id를 사용하세요.")
         sys.exit(1)
     run_pipeline(count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
                  adsense_mode=args.adsense_mode, golden_mode=args.golden,
