@@ -14,6 +14,10 @@ on:
         description: '드라이런 (true/false)'
         required: false
         default: 'false'
+      force:
+        description: '공휴일/주말 무시 강제 발행 (true/false)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: read
@@ -49,16 +53,20 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests holidays
 
       - name: Run ETF Report Pipeline
         run: |
           REPORT_TYPE="${{ github.event.inputs.report_type || 'blog-ready' }}"
           DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          FORCE="${{ github.event.inputs.force || 'false' }}"
 
           ARGS="--report-type $REPORT_TYPE"
           if [ "$DRY_RUN" = "true" ]; then
             ARGS="$ARGS --dry-run"
+          fi
+          if [ "$FORCE" = "true" ]; then
+            ARGS="$ARGS --force"
           fi
 
           python scripts/etf_report.py $ARGS

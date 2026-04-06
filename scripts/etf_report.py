@@ -880,7 +880,52 @@ def _simple_quality_check(content: str) -> float:
     return score
 
 
-def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False):
+def is_korean_market_open(today=None) -> bool:
+    """오늘이 한국 주식시장 개장일인지 확인 (평일 + 공휴일 제외)"""
+    if today is None:
+        today = datetime.now(KST).date()
+
+    # 주말 제외
+    if today.weekday() >= 5:  # 5=토, 6=일
+        log.info(f"[장 마감] {today} 주말 — 발행 스킵")
+        return False
+
+    # 한국 공휴일 체크
+    try:
+        import holidays as _holidays
+        kr_holidays = _holidays.KR(years=today.year)
+        if today in kr_holidays:
+            log.info(f"[장 마감] {today} 공휴일({kr_holidays[today]}) — 발행 스킵")
+            return False
+    except ImportError:
+        # holidays 패키지 없으면 하드코딩 fallback (2026년 주요 공휴일)
+        _HARDCODED_KR_HOLIDAYS_2026 = {
+            (1, 1),   # 신정
+            (1, 27),  # 설날 연휴
+            (1, 28),  # 설날
+            (1, 29),  # 설날 연휴
+            (3, 1),   # 삼일절
+            (5, 5),   # 어린이날
+            (5, 25),  # 부처님오신날
+            (6, 6),   # 현충일
+            (8, 15),  # 광복절
+            (9, 24),  # 추석 연휴
+            (9, 25),  # 추석
+            (9, 26),  # 추석 연휴
+            (10, 3),  # 개천절
+            (10, 9),  # 한글날
+            (12, 25), # 크리스마스
+            (12, 31), # 연말 휴장
+        }
+        if (today.month, today.day) in _HARDCODED_KR_HOLIDAYS_2026:
+            log.info(f"[장 마감] {today} 공휴일 — 발행 스킵")
+            return False
+
+    return True
+
+
+def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False,
+                   force: bool = False):
     """ETF 리포트 파이프라인 실행"""
     log.info("=" * 60)
     log.info(f"ETF Report Pipeline — {report_type} (퀀트 전략)")
@@ -888,6 +933,12 @@ def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False):
     log.info(f"  WP: {WP_URL}")
     log.info(f"  Dry Run: {dry_run}")
     log.info("=" * 60)
+
+    # ── 장 개장일 체크 (주말/공휴일 스킵)
+    if not force and not dry_run:
+        if not is_korean_market_open():
+            log.info("한국 주식시장 휴장일 — 파이프라인 종료")
+            return
 
     # Step 1: ETF Dashboard에서 리포트 fetch
     report = fetch_etf_report(report_type)
@@ -1103,6 +1154,7 @@ def main():
         help="리포트 유형",
     )
     parser.add_argument("--dry-run", action="store_true", help="발행 없이 테스트")
+    parser.add_argument("--force", action="store_true", help="공휴일/주말 무시하고 강제 발행")
     parser.add_argument("--etf-api-url", default="", help="ETF Dashboard API URL 오버라이드")
     args = parser.parse_args()
 
@@ -1110,7 +1162,7 @@ def main():
         global ETF_API_URL
         ETF_API_URL = args.etf_api_url
 
-    run_etf_report(report_type=args.report_type, dry_run=args.dry_run)
+    run_etf_report(report_type=args.report_type, dry_run=args.dry_run, force=args.force)
 
 
 if __name__ == "__main__":

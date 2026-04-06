@@ -172,12 +172,16 @@ def patch_post_category(post_id: int, cat_id: int, existing_cats: list) -> bool:
         return False  # 이미 적용됨
 
     new_cats = list(set(existing_cats + [cat_id]))
+
+    # WordPress REST API: POST 또는 PATCH 둘 다 지원, 명시적으로 PATCH 사용
     r = requests.post(
         f"{WP_URL}/wp-json/wp/v2/posts/{post_id}",
-        headers=headers,
+        headers={**headers, "X-HTTP-Method-Override": "PATCH"},
         json={"categories": new_cats},
         timeout=10,
     )
+    if not r.ok:
+        log.warning(f"    → HTTP {r.status_code}: {r.text[:300]}")
     return r.ok
 
 
