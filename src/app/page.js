@@ -2122,6 +2122,45 @@ function SettingsTab({ siteId, sites }) {
 // ═══════════════════════════════════════════
 
 function AdminTab({ autoMode, setAutoMode, selNiches, connectedAff, connectedApi }) {
+  const [reportType, setReportType] = useState('blog-ready');
+  const [etfDryRun, setEtfDryRun] = useState(false);
+  const [etfForce, setEtfForce] = useState(false);
+  const [etfStatus, setEtfStatus] = useState('idle'); // idle | loading | success | error
+  const [etfMsg, setEtfMsg] = useState('');
+  const [etfLogUrl, setEtfLogUrl] = useState('');
+
+  const handleEtfReport = async () => {
+    setEtfStatus('loading');
+    setEtfMsg('');
+    setEtfLogUrl('');
+    try {
+      const resp = await fetch('/api/etf-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report_type: reportType, dry_run: etfDryRun, force: etfForce }),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        setEtfStatus('success');
+        setEtfMsg(`${etfDryRun ? '[테스트] ' : ''}3days 리포트 발행 요청 완료! GitHub Actions 처리 중...`);
+        setEtfLogUrl(`https://github.com/${data.repo || 'mymiryu-commits/wp-auto'}/actions/workflows/etf-report.yml`);
+      } else {
+        setEtfStatus('error');
+        setEtfMsg(data.error || '요청 실패');
+      }
+    } catch (err) {
+      setEtfStatus('error');
+      setEtfMsg('네트워크 오류: ' + err.message);
+    }
+  };
+
+  const REPORT_TYPES = [
+    { id: 'blog-ready', label: '블로그 발행', desc: 'WordPress 즉시 발행' },
+    { id: 'daily', label: '일일 리포트', desc: '기본 분석 리포트' },
+    { id: 'rotation', label: '섹터 로테이션', desc: '섹터 수급 분석' },
+    { id: 'performance', label: '성과 분석', desc: '3days 전략 성과' },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1a1a2e' }}>관리자 패널</h2>
@@ -2152,6 +2191,102 @@ function AdminTab({ autoMode, setAutoMode, selNiches, connectedAff, connectedApi
           <Toggle on={autoMode} set={setAutoMode} />
         </div>
         <div style={{ fontSize: 12, color: '#94a3b8' }}>ON: CSV 소진 시 Trends+Reddit+AI에서 키워드 자동 발굴</div>
+      </Card>
+
+      {/* ── 3days 전략리포트 ── */}
+      <Card>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', marginBottom: 4 }}>
+          📊 3days 전략리포트 — 관리자 전용
+        </div>
+        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>
+          매일 KST 16:30 자동 발행 · 수동 즉시 발행 가능 (장 마감 후 권장)
+        </div>
+
+        {/* 리포트 유형 선택 */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>리포트 유형</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            {REPORT_TYPES.map(rt => (
+              <button key={rt.id} onClick={() => setReportType(rt.id)} style={{
+                padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                border: reportType === rt.id ? '2px solid #6366f1' : '1px solid #e2e8f0',
+                background: reportType === rt.id ? 'rgba(99,102,241,0.06)' : '#fff',
+                transition: 'all 0.15s',
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: reportType === rt.id ? '#6366f1' : '#1a1a2e' }}>{rt.label}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{rt.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 옵션 토글 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+          {[
+            { label: '테스트 모드', desc: '실제 발행 없이 엔진만 실행', val: etfDryRun, set: setEtfDryRun },
+            { label: '강제 발행', desc: '주말/공휴일 무시하고 발행', val: etfForce, set: setEtfForce },
+          ].map((opt, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 14px', borderRadius: 10, background: '#f8fafc',
+            }}>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{opt.label}</span>
+                <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 8 }}>{opt.desc}</span>
+              </div>
+              <button onClick={() => opt.set(!opt.val)} style={{
+                width: 44, height: 24, borderRadius: 12, border: 'none',
+                background: opt.val ? '#6366f1' : '#e2e8f0', cursor: 'pointer',
+                position: 'relative', transition: 'background 0.2s',
+              }}>
+                <div style={{
+                  width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                  position: 'absolute', top: 3, left: opt.val ? 23 : 3,
+                  transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* 발행 버튼 */}
+        <button onClick={handleEtfReport} disabled={etfStatus === 'loading'} style={{
+          width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none',
+          cursor: etfStatus === 'loading' ? 'not-allowed' : 'pointer',
+          background: etfDryRun
+            ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+            : 'linear-gradient(135deg, #6366f1, #818cf8)',
+          color: '#fff', fontSize: 15, fontWeight: 700,
+          opacity: etfStatus === 'loading' ? 0.7 : 1,
+          boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
+          transition: 'opacity 0.15s',
+        }}>
+          {etfStatus === 'loading' ? '요청 전송 중...'
+            : etfDryRun ? `[테스트] 3days 리포트 실행`
+            : `📊 3days 리포트 즉시 발행`}
+        </button>
+
+        {/* 결과 메시지 */}
+        {etfMsg && (
+          <div style={{
+            marginTop: 10, padding: '12px 16px', borderRadius: 10, fontSize: 13,
+            background: etfStatus === 'success' ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+            border: etfStatus === 'success' ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(239,68,68,0.2)',
+            color: etfStatus === 'success' ? '#059669' : '#dc2626',
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: etfLogUrl ? 8 : 0 }}>{etfMsg}</div>
+            {etfLogUrl && (
+              <a href={etfLogUrl} target="_blank" rel="noopener noreferrer" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 8,
+                background: 'rgba(16,185,129,0.1)', color: '#059669',
+                fontSize: 12, fontWeight: 700, textDecoration: 'none',
+              }}>
+                ↗ GitHub Actions 로그 확인
+              </a>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   );
