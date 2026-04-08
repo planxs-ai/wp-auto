@@ -2,20 +2,28 @@ name: AutoBlog Publish
 
 on:
   schedule:
-    # planx-ai: 08:00, 20:00 / bomissu: 08:30, 12:30, 19:30 (30분 오프셋으로 과부하 분산)
-    - cron: '0 23 * * *'    # KST 08:00 (planx-ai)
-    - cron: '30 23 * * *'   # KST 08:30 (bomissu)
-    - cron: '30 3 * * *'    # KST 12:30 (bomissu)
-    - cron: '30 10 * * *'   # KST 19:30 (bomissu)
-    - cron: '0 11 * * *'    # KST 20:00 (planx-ai)
+    # planx-ai.com: KST 08:00, 20:00
+    - cron: '0 23 * * *'    # KST 08:00
+    - cron: '0 11 * * *'    # KST 20:00
+    # bomissu.com: KST 08:30, 12:30, 19:30
+    - cron: '30 23 * * *'   # KST 08:30
+    - cron: '30 3 * * *'    # KST 12:30
+    - cron: '30 10 * * *'   # KST 19:30
   workflow_dispatch:
     inputs:
+      site_id:
+        description: 'Site ID (필수)'
+        required: true
+        type: choice
+        options:
+          - site-1
+          - site-1775046458524
       count:
-        description: '발행 편수 (사이트별)'
+        description: '발행 편수'
         required: false
-        default: '3'
+        default: '1'
       dry_run:
-        description: '드라이런 (true/false)'
+        description: '드라이런'
         type: choice
         required: false
         default: 'false'
@@ -32,11 +40,7 @@ on:
           - hotdeal
           - promo
       niche:
-        description: '니치 (쉼표로 복수 선택, 빈값=전체랜덤) 예: 재테크 & 투자,건강 & 웰니스,교육 & 자기계발'
-        required: false
-        default: ''
-      site_id:
-        description: 'Site ID (빈값=전체 활성 사이트)'
+        description: '니치 필터 (빈값=전체)'
         required: false
         default: ''
 
@@ -44,9 +48,13 @@ permissions:
   contents: write
 
 jobs:
-  publish:
+  # ═══ planx-ai.com ═══
+  planx-ai:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.event.inputs.site_id == 'site-1'
+      || github.event_name == 'schedule' && (github.event.schedule == '0 23 * * *' || github.event.schedule == '0 11 * * *')
 
     env:
       GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
@@ -58,18 +66,9 @@ jobs:
       UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
-      NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
-      NAVER_REFRESH_TOKEN: ${{ secrets.NAVER_REFRESH_TOKEN }}
-      NAVER_CAFE_CLUBID: ${{ secrets.NAVER_CAFE_CLUBID }}
-      NAVER_CAFE_MENUID: ${{ secrets.NAVER_CAFE_MENUID }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-      WP_URL: ${{ secrets.WP_URL }}
-      WP_USERNAME: ${{ secrets.WP_USERNAME }}
-      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
-      SITE_ID: ${{ secrets.SITE_ID }}
 
     steps:
       - name: Checkout
@@ -85,34 +84,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run AutoBlog Engine
+      - name: Publish planx-ai.com
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            COUNT="${{ github.event.inputs.count || '3' }}"
-            DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-            PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
-            NICHE="${{ github.event.inputs.niche || '' }}"
-            SITE_ID="${{ github.event.inputs.site_id || '' }}"
-          else
-            COUNT="1"
-            DRY_RUN="false"
-            PIPELINE="autoblog"
-            NICHE=""
-            SITE_ID=""
-          fi
+          COUNT="${{ github.event.inputs.count || '1' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
+          NICHE="${{ github.event.inputs.niche || '' }}"
 
-          ARGS="--count $COUNT --pipeline $PIPELINE --golden"
-
-          # site_id 지정 시 단일 사이트, 환경변수 SITE_ID 있으면 그것 사용, 둘 다 없으면 scheduled
-          if [ -n "$SITE_ID" ]; then
-            ARGS="$ARGS --site-id $SITE_ID"
-          elif [ -n "${{ secrets.SITE_ID }}" ]; then
-            ARGS="$ARGS --site-id ${{ secrets.SITE_ID }}"
-          elif [ -n "${{ secrets.WP_URL }}" ]; then
-            echo "WP_URL 환경변수 기반 단일 사이트 모드"
-          else
-            ARGS="$ARGS --mode scheduled"
-          fi
+          ARGS="--site-id site-1 --count $COUNT --pipeline $PIPELINE --golden"
 
           if [ "$DRY_RUN" = "true" ]; then
             ARGS="$ARGS --dry-run"
@@ -121,6 +100,7 @@ jobs:
             ARGS="$ARGS --niche \"$NICHE\""
           fi
 
+          echo "▶ planx-ai.com: python scripts/main.py $ARGS"
           python scripts/main.py $ARGS
 
       - name: Commit used keywords
@@ -130,5 +110,70 @@ jobs:
           git config user.name "AutoBlog Bot"
           git pull --rebase || true
           git add data/used_keywords.json || true
-          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d)"
+          git diff --staged --quiet || git commit -m "chore: update used keywords [planx-ai] $(date +%Y-%m-%d)"
+          git push || true
+
+  # ═══ bomissu.com ═══
+  bomissu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.event.inputs.site_id == 'site-1775046458524'
+      || github.event_name == 'schedule' && (github.event.schedule == '30 23 * * *' || github.event.schedule == '30 3 * * *' || github.event.schedule == '30 10 * * *')
+
+    env:
+      GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Publish bomissu.com
+        run: |
+          COUNT="${{ github.event.inputs.count || '1' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
+          NICHE="${{ github.event.inputs.niche || '' }}"
+
+          ARGS="--site-id site-1775046458524 --count $COUNT --pipeline $PIPELINE --golden"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ -n "$NICHE" ]; then
+            ARGS="$ARGS --niche \"$NICHE\""
+          fi
+
+          echo "▶ bomissu.com: python scripts/main.py $ARGS"
+          python scripts/main.py $ARGS
+
+      - name: Commit used keywords
+        if: always()
+        run: |
+          git config user.email "bot@autoblog.com"
+          git config user.name "AutoBlog Bot"
+          git pull --rebase || true
+          git add data/used_keywords.json || true
+          git diff --staged --quiet || git commit -m "chore: update used keywords [bomissu] $(date +%Y-%m-%d)"
           git push || true
