@@ -3642,7 +3642,7 @@ def should_run_now(site_config=None):
     return True
 
 
-def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None, adsense_mode=False, golden_mode=False, cli_draft_model="", cli_polish_model=""):
+def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None, adsense_mode=False, golden_mode=False, cli_draft_model="", cli_polish_model="", niches=None):
     """단일 사이트 파이프라인. site_override가 있으면 해당 사이트 설정 사용."""
     global SITE_ID, WP_URL, WP_USER, WP_PASS
 
@@ -3738,13 +3738,38 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
     wp = WordPressPublisher()
     sb = SupabaseLogger()
 
-    # 1순위: 정적 keywords.json (SEO slug/메타 포함된 큐레이션 키워드)
-    keywords = km.select(count=count, pipeline=pipeline, kw_mix=stage_cfg["kw_mix"])
+    # 니치 리스트: 글마다 랜덤 선택
+    niche_list = niches or []
+    if niche_list:
+        log.info(f"  니치 풀: {niche_list} (글마다 랜덤 선택)")
 
-    # 2순위: 동적 키워드 생성 폴백 (정적 키워드 소진 시, 기본 니치로 자동 보충)
+    # 1순위: 정적 keywords.json — 니치별로 분산 선택
+    if niche_list:
+        keywords = []
+        per_niche = max(1, count // len(niche_list))
+        remainder = count - per_niche * len(niche_list)
+        random.shuffle(niche_list)
+        for idx, n in enumerate(niche_list):
+            n_count = per_niche + (1 if idx < remainder else 0)
+            kws = km.select(count=n_count, pipeline=pipeline, niche=n, kw_mix=stage_cfg["kw_mix"])
+            keywords.extend(kws)
+        random.shuffle(keywords)
+        keywords = keywords[:count]
+    else:
+        keywords = km.select(count=count, pipeline=pipeline, kw_mix=stage_cfg["kw_mix"])
+
+    # 2순위: 동적 키워드 생성 폴백 (정적 키워드 소진 시)
     if not keywords:
         log.info("  정적 키워드 소진 → 동적 키워드 자동 보충")
-        keywords = dkg.generate(count=count, fallback=True)
+        if niche_list:
+            keywords = []
+            for n in niche_list:
+                kws_gen = dkg._generate_for_niche(n, max(1, count // len(niche_list)))
+                keywords.extend(kws_gen)
+            random.shuffle(keywords)
+            keywords = keywords[:count]
+        else:
+            keywords = dkg.generate(count=count, fallback=True)
 
     if not keywords:
         log.error("사용 가능한 키워드 없음!")
@@ -4166,6 +4191,11 @@ def main():
         log.error("AI API 키가 하나도 없음 (DEEPSEEK/GROK/GEMINI 중 1개 필요)")
         sys.exit(1)
 
+    # 니치 파싱: 쉼표 구분 → 리스트
+    cli_niches = [n.strip() for n in args.niche.split(",") if n.strip()] if args.niche else []
+    if cli_niches:
+        log.info(f"니치 설정: {cli_niches}")
+
     # ETF 리포트 파이프라인 (별도 모듈로 위임)
     if args.pipeline == "etf-report":
         from etf_report import run_etf_report
@@ -4189,6 +4219,7 @@ def main():
                     count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
                     site_override=site, golden_mode=args.golden,
                     cli_draft_model=args.draft_model, cli_polish_model=args.polish_model,
+                    niches=cli_niches,
                 )
             except Exception as e:
                 log.error(f"[{site_id}] 파이프라인 실패: {e}")
@@ -4203,7 +4234,8 @@ def main():
         if site:
             run_pipeline(count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
                          site_override=site, adsense_mode=args.adsense_mode, golden_mode=args.golden,
-                         cli_draft_model=args.draft_model, cli_polish_model=args.polish_model)
+                         cli_draft_model=args.draft_model, cli_polish_model=args.polish_model,
+                         niches=cli_niches)
         else:
             log.error(f"사이트 '{args.site_id}' 를 찾을 수 없습니다.")
             sys.exit(1)
@@ -4215,7 +4247,8 @@ def main():
         sys.exit(1)
     run_pipeline(count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
                  adsense_mode=args.adsense_mode, golden_mode=args.golden,
-                 cli_draft_model=args.draft_model, cli_polish_model=args.polish_model)
+                 cli_draft_model=args.draft_model, cli_polish_model=args.polish_model,
+                 niches=cli_niches)
 
 
 if __name__ == "__main__":

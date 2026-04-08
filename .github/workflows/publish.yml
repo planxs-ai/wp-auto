@@ -32,24 +32,9 @@ on:
           - hotdeal
           - promo
       niche:
-        description: '니치 (AI자동=랜덤)'
-        type: choice
+        description: '니치 (쉼표로 복수 선택, 빈값=전체랜덤) 예: 재테크 & 투자,건강 & 웰니스,교육 & 자기계발'
         required: false
-        default: 'AI자동'
-        options:
-          - 'AI자동'
-          - 'AI 활용 & 생산성'
-          - '재테크 & 투자'
-          - '부업 & 수익화'
-          - '정부지원 & 보조금'
-          - '세무 & 절세'
-          - '여행 & 라이프'
-          - '건강 & 웰니스'
-          - '뷰티 & 패션'
-          - '생활가전 & 스마트홈'
-          - '교육 & 자기계발'
-          - '행사 & 트렌드'
-          - '비교 & 리뷰'
+        default: ''
       site_id:
         description: 'Site ID (빈값=전체 활성 사이트)'
         required: false
@@ -106,13 +91,7 @@ jobs:
             COUNT="${{ github.event.inputs.count || '3' }}"
             DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
             PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
-            NICHE_INPUT="${{ github.event.inputs.niche || 'AI자동' }}"
-            # AI자동 = 빈값으로 → main.py가 AI 자율 생성
-            if [ "$NICHE_INPUT" = "AI자동" ]; then
-              NICHE=""
-            else
-              NICHE="$NICHE_INPUT"
-            fi
+            NICHE="${{ github.event.inputs.niche || '' }}"
             SITE_ID="${{ github.event.inputs.site_id || '' }}"
           else
             COUNT="1"
