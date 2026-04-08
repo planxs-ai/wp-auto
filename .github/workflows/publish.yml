@@ -103,13 +103,9 @@ jobs:
 
           ARGS="--count $COUNT --pipeline $PIPELINE --golden"
 
-          # site_id 지정 시 단일 사이트, 환경변수 SITE_ID 있으면 그것 사용, 둘 다 없으면 scheduled
+          # site_id 지정 시 단일 사이트, 미지정 시 전체 활성 사이트 순회
           if [ -n "$SITE_ID" ]; then
             ARGS="$ARGS --site-id $SITE_ID"
-          elif [ -n "${{ secrets.SITE_ID }}" ]; then
-            ARGS="$ARGS --site-id ${{ secrets.SITE_ID }}"
-          elif [ -n "${{ secrets.WP_URL }}" ]; then
-            echo "WP_URL 환경변수 기반 단일 사이트 모드"
           else
             ARGS="$ARGS --mode scheduled"
           fi
