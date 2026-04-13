@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_REPO = process.env.GITHUB_REPO || 'planxs-ai/wp-auto';
+import { getGitHubCredentials } from '@/lib/github-helper';
 
 // Each workflow and its allowed input keys (GitHub 422s on unknown inputs)
 const WORKFLOW_CONFIG = {
@@ -71,30 +69,9 @@ async function getSiteCredentials(siteId) {
 }
 
 export async function POST(request) {
-  if (!GITHUB_TOKEN) {
-    return NextResponse.json({
-      error: 'GITHUB_TOKEN이 설정되지 않았습니다.',
-      guide: '셀프 호스팅: Vercel 환경변수에 GITHUB_TOKEN (repo + workflow 권한)과 GITHUB_REPO (your-username/wp-auto)를 설정하세요.',
-    }, { status: 500 });
-  }
-
   const user = await verifyAuth(request);
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Admin role check — only admin can trigger workflows
-  const supabaseAdmin = getSupabaseAdmin();
-  const { data: profile } = await supabaseAdmin
-    .from('user_profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-  if (profile?.role !== 'admin') {
-    return NextResponse.json({
-      error: '관리자만 워크플로우를 실행할 수 있습니다.',
-      guide: '셀프 호스팅: 첫 번째 가입자가 자동으로 관리자가 됩니다.',
-    }, { status: 403 });
   }
 
   const { action, siteId, inputs } = await request.json();
@@ -102,6 +79,44 @@ export async function POST(request) {
   const config = WORKFLOW_CONFIG[action];
   if (!config) {
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+  }
+
+  // 사이트별 GitHub 인증정보 조회
+  const gh = await getGitHubCredentials(siteId);
+
+  // 권한 확인: 고객 fork(site 소유자) 또는 admin
+  const supabaseAdmin = getSupabaseAdmin();
+  if (gh?.source === 'site') {
+    // 고객 fork — 사이트 소유자만 허용
+    const { data: userSite } = await supabaseAdmin
+      .from('user_sites')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('site_id', siteId)
+      .single();
+    if (!userSite) {
+      return NextResponse.json({ error: '해당 사이트에 대한 권한이 없습니다.' }, { status: 403 });
+    }
+  } else {
+    // env 변수 fallback — admin만 허용
+    const { data: profile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({
+        error: '관리자만 워크플로우를 실행할 수 있습니다.',
+        guide: 'GitHub 연동에서 Fork 저장소를 먼저 등록하세요.',
+      }, { status: 403 });
+    }
+  }
+
+  if (!gh) {
+    return NextResponse.json({
+      error: 'GitHub 인증정보가 없습니다.',
+      guide: '설정 > GitHub 연동에서 Fork 저장소와 토큰을 먼저 등록하세요.',
+    }, { status: 400 });
   }
 
   // Fetch site credentials from Supabase
@@ -131,14 +146,14 @@ export async function POST(request) {
     }
   }
 
-  const [owner, repo] = GITHUB_REPO.split('/');
+  const [owner, repo] = gh.repo.split('/');
 
   const resp = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${config.file}/dispatches`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+        'Authorization': `Bearer ${gh.token}`,
         'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json',
       },
@@ -149,23 +164,19 @@ export async function POST(request) {
   if (resp.status === 204) {
     return NextResponse.json({
       success: true, action,
-      message: `${action} triggered for ${creds.domain}`,
+      message: `${action} triggered on ${gh.repo} for ${creds.domain}`,
     });
   }
 
   const errorBody = await resp.text();
-  const isDefaultRepo = !process.env.GITHUB_REPO || process.env.GITHUB_REPO === 'planxs-ai/wp-auto';
-  const repoGuide = isDefaultRepo
-    ? 'GITHUB_REPO가 기본값입니다. fork한 경우 Vercel 환경변수에 GITHUB_REPO=your-username/wp-auto를 설정하세요.'
-    : null;
-  const tokenGuide = resp.status === 403 || resp.status === 404
-    ? 'GITHUB_TOKEN의 권한을 확인하세요 (repo + workflow 스코프 필요).'
-    : null;
-
   return NextResponse.json({
     error: `GitHub API failed: ${resp.status}`,
     detail: errorBody,
-    guide: repoGuide || tokenGuide || null,
-    debug: { repo: GITHUB_REPO, workflow: config.file, site: creds.domain, tokenSet: !!GITHUB_TOKEN },
+    guide: resp.status === 404
+      ? 'Fork 저장소를 확인하세요. publish.yml이 존재하는지 확인해주세요.'
+      : resp.status === 403
+      ? 'GitHub Token 권한을 확인하세요 (repo + workflow 스코프 필요).'
+      : null,
+    debug: { repo: gh.repo, workflow: config.file, site: creds.domain },
   }, { status: resp.status });
 }

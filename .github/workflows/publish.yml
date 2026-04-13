@@ -2,22 +2,16 @@ name: AutoBlog Publish
 
 on:
   schedule:
-    # planx-ai.com: KST 08:00, 20:00
+    # Fork 기본 스케줄: KST 08:00, 14:00, 20:00
     - cron: '0 23 * * *'    # KST 08:00
+    - cron: '0 5 * * *'     # KST 14:00
     - cron: '0 11 * * *'    # KST 20:00
-    # bomissu.com: KST 08:30, 12:30, 19:30
-    - cron: '30 23 * * *'   # KST 08:30
-    - cron: '30 3 * * *'    # KST 12:30
-    - cron: '30 10 * * *'   # KST 19:30
+    # planx-ai 추가 스케줄
+    - cron: '30 23 * * *'   # KST 08:30 (bomissu)
+    - cron: '30 3 * * *'    # KST 12:30 (bomissu)
+    - cron: '30 10 * * *'   # KST 19:30 (bomissu)
   workflow_dispatch:
     inputs:
-      site_id:
-        description: 'Site ID (필수)'
-        required: true
-        type: choice
-        options:
-          - site-1
-          - site-1775046458524
       count:
         description: '발행 편수'
         required: false
@@ -48,13 +42,77 @@ permissions:
   contents: write
 
 jobs:
-  # ═══ planx-ai.com ═══
+  # ═══════════════════════════════════════════
+  # Fork 전용 — planxs-ai/wp-auto 이외의 모든 fork에서 실행
+  # GitHub Secrets 3개만 설정: SUPABASE_URL, SUPABASE_KEY, SITE_ID
+  # API 키는 대시보드 설정에서 입력 → Supabase에 저장됨
+  # ═══════════════════════════════════════════
+  fork-publish:
+    if: github.repository != 'planxs-ai/wp-auto'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      SITE_ID: ${{ secrets.SITE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Publish
+        env:
+          FORCE_RUN: 'true'
+        run: |
+          if [ -z "$SITE_ID" ]; then
+            echo "❌ SITE_ID 시크릿이 설정되지 않았습니다."
+            echo "GitHub Fork → Settings → Secrets → SITE_ID를 추가하세요."
+            exit 1
+          fi
+
+          COUNT="${{ github.event.inputs.count || '1' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
+          NICHE="${{ github.event.inputs.niche || '' }}"
+
+          ARGS="--site-id $SITE_ID --count $COUNT --pipeline $PIPELINE --golden"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ -n "$NICHE" ]; then
+            ARGS="$ARGS --niche \"$NICHE\""
+          fi
+
+          echo "▶ python scripts/main.py $ARGS"
+          python scripts/main.py $ARGS
+
+      - name: Commit used keywords
+        if: always()
+        run: |
+          git config user.email "bot@autoblog.com"
+          git config user.name "AutoBlog Bot"
+          git add data/used_keywords.json || true
+          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d)"
+          git push || true
+
+  # ═══ planx-ai.com (원본 전용) ═══
   planx-ai:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: >-
-      github.event_name == 'workflow_dispatch' && github.event.inputs.site_id == 'site-1'
-      || github.event_name == 'schedule' && (github.event.schedule == '0 23 * * *' || github.event.schedule == '0 11 * * *')
+      github.repository == 'planxs-ai/wp-auto'
+      && (github.event_name == 'workflow_dispatch'
+      || github.event_name == 'schedule' && (github.event.schedule == '0 23 * * *' || github.event.schedule == '0 11 * * *'))
 
     env:
       ALLOWED_SITE_IDS: "site-1,site-1775046458524"
@@ -137,8 +195,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     if: >-
-      github.event_name == 'workflow_dispatch' && github.event.inputs.site_id == 'site-1775046458524'
-      || github.event_name == 'schedule' && (github.event.schedule == '30 23 * * *' || github.event.schedule == '30 3 * * *' || github.event.schedule == '30 10 * * *')
+      github.repository == 'planxs-ai/wp-auto'
+      && (github.event_name == 'workflow_dispatch'
+      || github.event_name == 'schedule' && (github.event.schedule == '30 23 * * *' || github.event.schedule == '30 3 * * *' || github.event.schedule == '30 10 * * *'))
 
     env:
       ALLOWED_SITE_IDS: "site-1,site-1775046458524"

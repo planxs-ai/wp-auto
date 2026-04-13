@@ -3679,6 +3679,37 @@ def should_run_now(site_config=None):
     return True
 
 
+def _load_api_keys_from_site(site_config):
+    """사이트 config.api_keys에서 API 키 로드 (환경변수 없을 때 폴백).
+    고객 Fork에서 GitHub Secrets 없이 Supabase에서 API 키를 읽는 용도."""
+    global DEEPSEEK_KEY, CLAUDE_KEY, GROK_KEY, GEMINI_KEY
+    global UNSPLASH_KEY, PEXELS_KEY, PIXABAY_KEY
+
+    cfg = (site_config or {}).get("config") or {}
+    api_keys = cfg.get("api_keys") or {}
+    if not api_keys:
+        return
+
+    key_map = {
+        "DEEPSEEK_API_KEY": "DEEPSEEK_KEY",
+        "CLAUDE_API_KEY": "CLAUDE_KEY",
+        "GROK_API_KEY": "GROK_KEY",
+        "GEMINI_API_KEY": "GEMINI_KEY",
+        "UNSPLASH_ACCESS_KEY": "UNSPLASH_KEY",
+        "PEXELS_API_KEY": "PEXELS_KEY",
+        "PIXABAY_API_KEY": "PIXABAY_KEY",
+    }
+    g = globals()
+    loaded = []
+    for env_name, var_name in key_map.items():
+        if not g.get(var_name) and api_keys.get(env_name):
+            g[var_name] = api_keys[env_name]
+            loaded.append(env_name)
+
+    if loaded:
+        log.info(f"  Supabase에서 API 키 {len(loaded)}개 로드: {', '.join(loaded)}")
+
+
 def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None, adsense_mode=False, golden_mode=False, cli_draft_model="", cli_polish_model="", niches=None):
     """단일 사이트 파이프라인. site_override가 있으면 해당 사이트 설정 사용."""
     global SITE_ID, WP_URL, WP_USER, WP_PASS
@@ -3690,9 +3721,13 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         cfg = site_override.get("config") or {}
         WP_USER = cfg.get("wp_username", "") or WP_USER
         WP_PASS = cfg.get("wp_app_password", "") or WP_PASS
+        # Fork 모드: API 키가 환경변수에 없으면 Supabase에서 로드
+        _load_api_keys_from_site(site_override)
         site_config = site_override
     else:
         site_config = _get_site_config()
+        if site_config:
+            _load_api_keys_from_site(site_config)
 
     if site_config:
         if site_config.get("status") == "paused":
@@ -3730,6 +3765,10 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
 
     if not WP_URL:
         log.error(f"[{SITE_ID}] WP_URL 없음 — 스킵")
+        return
+
+    if not (DEEPSEEK_KEY or GROK_KEY or GEMINI_KEY):
+        log.error(f"[{SITE_ID}] AI API 키 없음 (env + Supabase 모두 확인). 대시보드에서 API 키를 입력하세요.")
         return
 
     log.info("=" * 60)
@@ -4250,7 +4289,8 @@ def main():
         epc.create_all(site_name=args.site_name, email=args.email)
         sys.exit(0)
 
-    if not (DEEPSEEK_KEY or GROK_KEY or GEMINI_KEY):
+    # AI API 키 체크: --site-id 모드는 Supabase에서 로드 가능하므로 나중에 체크
+    if not args.site_id and not args.mode and not (DEEPSEEK_KEY or GROK_KEY or GEMINI_KEY):
         log.error("AI API 키가 하나도 없음 (DEEPSEEK/GROK/GEMINI 중 1개 필요)")
         sys.exit(1)
 

@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_REPO = process.env.GITHUB_REPO || 'planxs-ai/wp-auto';
+import { getGitHubCredentials } from '@/lib/github-helper';
 
 function getSupabaseAdmin() {
   return createClient(
@@ -53,13 +51,13 @@ async function encryptSecret(publicKey, secretValue) {
 /**
  * GitHub repo의 public key 조회
  */
-async function getRepoPublicKey() {
-  const [owner, repo] = GITHUB_REPO.split('/');
+async function getRepoPublicKey(ghToken, ghRepo) {
+  const [owner, repo] = ghRepo.split('/');
   const resp = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/actions/secrets/public-key`,
     {
       headers: {
-        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+        'Authorization': `Bearer ${ghToken}`,
         'Accept': 'application/vnd.github.v3+json',
       },
     }
@@ -73,14 +71,14 @@ async function getRepoPublicKey() {
 /**
  * GitHub repo에 secret 설정
  */
-async function setRepoSecret(secretName, encryptedValue, keyId) {
-  const [owner, repo] = GITHUB_REPO.split('/');
+async function setRepoSecret(ghToken, ghRepo, secretName, encryptedValue, keyId) {
+  const [owner, repo] = ghRepo.split('/');
   const resp = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/actions/secrets/${secretName}`,
     {
       method: 'PUT',
       headers: {
-        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+        'Authorization': `Bearer ${ghToken}`,
         'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json',
       },
@@ -107,13 +105,6 @@ async function setRepoSecret(secretName, encryptedValue, keyId) {
  * }
  */
 export async function POST(request) {
-  if (!GITHUB_TOKEN) {
-    return NextResponse.json({
-      error: 'GITHUB_TOKEN이 설정되지 않았습니다.',
-      guide: 'Vercel 환경변수에 GITHUB_TOKEN (repo + workflow 권한)을 설정하세요.',
-    }, { status: 500 });
-  }
-
   const user = await verifyAuth(request);
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -137,8 +128,19 @@ export async function POST(request) {
     }
   }
 
+  // 사이트별 GitHub 인증정보 조회 (고객 fork 또는 env 변수)
+  const gh = await getGitHubCredentials(siteId);
+  if (!gh) {
+    return NextResponse.json({
+      error: 'GitHub 인증정보가 없습니다.',
+      guide: gh?.source === 'env'
+        ? 'Vercel 환경변수에 GITHUB_TOKEN을 설정하세요.'
+        : '설정 > GitHub 연동에서 Fork 저장소와 토큰을 먼저 등록하세요.',
+    }, { status: 400 });
+  }
+
   try {
-    const { key: publicKey, key_id: keyId } = await getRepoPublicKey();
+    const { key: publicKey, key_id: keyId } = await getRepoPublicKey(gh.token, gh.repo);
     const results = {};
 
     if (action === 'setup') {
@@ -146,7 +148,7 @@ export async function POST(request) {
       for (const [name, value] of Object.entries(secrets)) {
         if (!value) continue;
         const encrypted = await encryptSecret(publicKey, value);
-        const ok = await setRepoSecret(name, encrypted, keyId);
+        const ok = await setRepoSecret(gh.token, gh.repo, name, encrypted, keyId);
         results[name] = ok ? 'success' : 'failed';
       }
 
@@ -158,7 +160,7 @@ export async function POST(request) {
       for (const [name, value] of Object.entries(autoSecrets)) {
         if (!value) continue;
         const encrypted = await encryptSecret(publicKey, value);
-        const ok = await setRepoSecret(name, encrypted, keyId);
+        const ok = await setRepoSecret(gh.token, gh.repo, name, encrypted, keyId);
         results[name] = ok ? 'auto' : 'failed';
       }
 
@@ -172,7 +174,7 @@ export async function POST(request) {
 
         const allowedIds = (userSites || []).map(s => s.site_id).join(',');
         const encrypted = await encryptSecret(publicKey, allowedIds);
-        const ok = await setRepoSecret('ALLOWED_SITE_IDS', encrypted, keyId);
+        const ok = await setRepoSecret(gh.token, gh.repo, 'ALLOWED_SITE_IDS', encrypted, keyId);
         results['ALLOWED_SITE_IDS'] = ok ? 'auto' : 'failed';
       }
     } else if (action === 'sync-allowed-sites') {
@@ -185,7 +187,7 @@ export async function POST(request) {
 
       const allowedIds = (userSites || []).map(s => s.site_id).join(',');
       const encrypted = await encryptSecret(publicKey, allowedIds);
-      const ok = await setRepoSecret('ALLOWED_SITE_IDS', encrypted, keyId);
+      const ok = await setRepoSecret(gh.token, gh.repo, 'ALLOWED_SITE_IDS', encrypted, keyId);
       results['ALLOWED_SITE_IDS'] = ok ? 'success' : 'failed';
     }
 
@@ -194,15 +196,15 @@ export async function POST(request) {
     return NextResponse.json({
       success: failCount === 0,
       results,
-      repo: GITHUB_REPO,
+      repo: gh.repo,
       message: failCount === 0
-        ? `${Object.keys(results).length}개 시크릿이 GitHub에 등록되었습니다.`
-        : `${failCount}개 시크릿 등록 실패. GITHUB_TOKEN 권한을 확인하세요.`,
+        ? `${Object.keys(results).length}개 시크릿이 ${gh.repo}에 등록되었습니다.`
+        : `${failCount}개 시크릿 등록 실패. GitHub Token 권한을 확인하세요.`,
     });
   } catch (err) {
     return NextResponse.json({
       error: err.message,
-      guide: 'GITHUB_TOKEN 권한(repo + workflow 스코프)을 확인하세요.',
+      guide: 'GitHub Token 권한(repo + workflow 스코프)을 확인하세요.',
     }, { status: 500 });
   }
 }

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generatePublishWorkflow } from '@/lib/workflow-template';
+import { getGitHubCredentials } from '@/lib/github-helper';
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_REPO = process.env.GITHUB_REPO || 'planxs-ai/wp-auto';
 const WORKFLOW_PATH = '.github/workflows/publish.yml';
 
 function getSupabaseAdmin() {
@@ -35,13 +34,6 @@ async function verifyAuth(request) {
  * Body: { siteId, scheduleTimes: ['08:00', '18:00'], dailyCount: 2 }
  */
 export async function POST(request) {
-  if (!GITHUB_TOKEN) {
-    return NextResponse.json({
-      error: 'GITHUB_TOKEN이 설정되지 않았습니다.',
-      guide: 'Vercel 환경변수에 GITHUB_TOKEN (repo + workflow 권한)을 설정하세요.',
-    }, { status: 500 });
-  }
-
   const user = await verifyAuth(request);
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -70,6 +62,15 @@ export async function POST(request) {
     }, { status: 403 });
   }
 
+  // 사이트별 GitHub 인증정보 조회
+  const gh = await getGitHubCredentials(siteId);
+  if (!gh) {
+    return NextResponse.json({
+      error: 'GitHub 인증정보가 없습니다.',
+      guide: '설정 > GitHub 연동에서 Fork 저장소와 토큰을 먼저 등록하세요.',
+    }, { status: 400 });
+  }
+
   // publish.yml 생성
   const workflowContent = generatePublishWorkflow({
     siteId,
@@ -77,10 +78,10 @@ export async function POST(request) {
     count: '1',
   });
 
-  const [owner, repo] = GITHUB_REPO.split('/');
+  const [owner, repo] = gh.repo.split('/');
   const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
   const headers = {
-    'Authorization': `Bearer ${GITHUB_TOKEN}`,
+    'Authorization': `Bearer ${gh.token}`,
     'Accept': 'application/vnd.github.v3+json',
     'Content-Type': 'application/json',
   };
@@ -108,8 +109,8 @@ export async function POST(request) {
     if (putResp.ok) {
       return NextResponse.json({
         success: true,
-        message: `스케줄이 GitHub에 반영되었습니다 (${scheduleTimes.join(', ')})`,
-        repo: GITHUB_REPO,
+        message: `스케줄이 ${gh.repo}에 반영되었습니다 (${scheduleTimes.join(', ')})`,
+        repo: gh.repo,
         crons: scheduleTimes.length,
       });
     }
@@ -119,9 +120,9 @@ export async function POST(request) {
       error: `GitHub API 실패: ${putResp.status}`,
       detail: errorBody,
       guide: putResp.status === 404
-        ? 'GITHUB_REPO를 확인하세요. fork한 repo 주소가 맞는지 확인해주세요.'
+        ? 'Fork 저장소 주소를 확인하세요.'
         : putResp.status === 403
-        ? 'GITHUB_TOKEN 권한을 확인하세요 (repo + workflow 스코프 필요).'
+        ? 'GitHub Token 권한을 확인하세요 (repo + workflow 스코프 필요).'
         : null,
     }, { status: putResp.status });
   } catch (err) {

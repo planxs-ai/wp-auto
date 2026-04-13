@@ -79,7 +79,7 @@ export default function SettingsPage() {
   // Site registration error
   const [siteError, setSiteError] = useState('');
 
-  // GitHub secrets
+  // API keys (Supabase에 저장)
   const [ghSecrets, setGhSecrets] = useState({
     DEEPSEEK_API_KEY: '', GROK_API_KEY: '', GEMINI_API_KEY: '',
     CLAUDE_API_KEY: '', PEXELS_API_KEY: '', PIXABAY_API_KEY: '',
@@ -88,6 +88,7 @@ export default function SettingsPage() {
   const [ghSecretsResult, setGhSecretsResult] = useState(null);
   const [ghSecretsSaving, setGhSecretsSaving] = useState(false);
   const [ghSecretsComplete, setGhSecretsComplete] = useState(false);
+  const [copiedField, setCopiedField] = useState('');
 
   // System health
   const [systemHealth, setSystemHealth] = useState(null);
@@ -142,6 +143,20 @@ export default function SettingsPage() {
     }
   }, [site, sites.length, sitesLoading]);
 
+  // API 키 로드 (sites.config.api_keys)
+  useEffect(() => {
+    if (site?.config?.api_keys) {
+      const keys = site.config.api_keys;
+      setGhSecrets(prev => ({
+        ...prev,
+        ...Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, v ? '********' : '']))
+      }));
+      if (keys.DEEPSEEK_API_KEY || keys.GROK_API_KEY || keys.GEMINI_API_KEY) {
+        setGhSecretsComplete(true);
+      }
+    }
+  }, [site?.id]);
+
   // ── Step completion ──
   const siteConnected = !!site;
   const completedSetupIds = useMemo(
@@ -155,39 +170,42 @@ export default function SettingsPage() {
 
   const currentStepComplete = (stepId) => {
     if (stepId === 1) return siteConnected;
-    if (stepId === 2) return ghSecretsComplete || isCentral();
+    if (stepId === 2) return ghSecretsComplete || (isCentral() && isAdmin);
     if (stepId === 3) return step3Complete;
     return false;
   };
 
-  // ── GitHub Secrets 등록 ──
+  // ── API 키 저장 (Supabase sites.config.api_keys) ──
   const registerGhSecrets = async () => {
     if (!site?.id) return;
     setGhSecretsSaving(true);
     setGhSecretsResult(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const resp = await fetch('/api/github-secrets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
-          action: 'setup',
-          siteId: site.id,
-          secrets: Object.fromEntries(
-            Object.entries(ghSecrets).filter(([, v]) => v.trim())
-          ),
-        }),
+      // 실제 값만 필터 (********는 기존 값 유지)
+      const newKeys = Object.fromEntries(
+        Object.entries(ghSecrets).filter(([, v]) => v.trim() && v !== '********')
+      );
+      const mergedKeys = { ...(site.config?.api_keys || {}), ...newKeys };
+
+      await supabase.from('sites').update({
+        config: { ...site.config, api_keys: mergedKeys },
+      }).eq('id', site.id);
+
+      setGhSecretsResult({
+        success: true,
+        message: `API 키 ${Object.keys(newKeys).length}개가 저장되었습니다.`,
       });
-      const result = await resp.json();
-      setGhSecretsResult(result);
-      if (result.success) setGhSecretsComplete(true);
+      setGhSecretsComplete(true);
     } catch (err) {
       setGhSecretsResult({ error: err.message });
     }
     setGhSecretsSaving(false);
+  };
+
+  const copyToClipboard = (text, field) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(''), 2000);
   };
 
   // ── Site actions ──
@@ -522,7 +540,7 @@ export default function SettingsPage() {
 
   const formReady = wpUrl && wpUser && wpPassword;
   const nicheReady = selectedCats.length >= 2;
-  const canLaunch = isAdmin || !isCentral(); // admin or self-hosted owner
+  const canLaunch = isAdmin || !isCentral() || ghSecretsComplete; // admin, self-hosted, or fork owner
   const launchReady = canLaunch && nicheReady && blogOwner && contactEmail;
 
   return (
@@ -706,8 +724,8 @@ export default function SettingsPage() {
       </Card>
       )}
 
-      {/* ═══ STEP 2: GitHub 연동 (셀프 호스팅 전용) ═══ */}
-      {!isCentral() && (
+      {/* ═══ STEP 2: GitHub 연동 + API 키 ═══ */}
+      {(isCentral() && isAdmin) ? null : (
         siteConnected && ghSecretsComplete ? (
           <div style={{ marginBottom: 20 }}>
             <div style={{
@@ -719,16 +737,22 @@ export default function SettingsPage() {
               <StepBadge num={2} done={true} />
               <div style={{ fontSize: 12, color: 'var(--text-dim)', flexShrink: 0 }}>STEP 2</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', flex: 1 }}>
-                GitHub Secrets 등록 완료
+                API 키 등록 완료
               </div>
               <span style={{ fontSize: 11, color: 'var(--green)', flexShrink: 0 }}>
                 {'\u2705'} 완료
               </span>
             </div>
+            <button
+              onClick={() => setGhSecretsComplete(false)}
+              style={{ border: 'none', background: 'none', color: 'var(--text-dim)', fontSize: 10, cursor: 'pointer', textDecoration: 'underline', marginTop: 4, marginLeft: 16 }}
+            >
+              API 키 변경
+            </button>
           </div>
         ) : (
         <Card style={{ marginBottom: 20, opacity: siteConnected ? 1 : 0.5, pointerEvents: siteConnected ? 'auto' : 'none' }}>
-          <SectionTitle>STEP 2 &mdash; GitHub 연동</SectionTitle>
+          <SectionTitle>STEP 2 &mdash; {isCentral() ? 'Fork + API 키' : 'API 키 등록'}</SectionTitle>
           {!siteConnected && (
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
               {'\uD83D\uDD12'} STEP 1에서 사이트를 먼저 연결해주세요.
@@ -737,15 +761,74 @@ export default function SettingsPage() {
 
           {siteConnected && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ padding: 12, background: 'var(--accent-bg)', borderRadius: 10, fontSize: 12, color: 'var(--accent)', fontWeight: 500 }}>
-                {'\uD83D\uDD11'} AI API 키를 입력하면 GitHub Secrets에 자동 등록됩니다.
-                Site ID, Supabase 정보, 허용 사이트 목록은 자동으로 설정됩니다.
-              </div>
+              {/* Central 모드: Fork 안내 + 시크릿 복사 */}
+              {isCentral() && (
+                <>
+                  {/* Fork 안내 */}
+                  <a
+                    href="https://github.com/planxs-ai/wp-auto/fork"
+                    target="_blank" rel="noopener"
+                    style={{
+                      display: 'block', textAlign: 'center', padding: '10px 16px',
+                      background: 'var(--bg-secondary)', borderRadius: 10,
+                      color: 'var(--accent)', fontWeight: 600, fontSize: 13,
+                      textDecoration: 'none', border: '1px solid var(--border-light)',
+                    }}
+                  >
+                    1. GitHub에서 Fork하기 &rarr;
+                  </a>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -8 }}>
+                    Fork 후 Actions 탭에서 &quot;I understand my workflows, go ahead and enable them&quot; 클릭
+                  </div>
 
-              <div style={{ padding: 10, background: 'var(--bg-secondary)', borderRadius: 8, fontSize: 11, color: 'var(--text-dim)' }}>
-                Site ID: <code style={{ color: 'var(--accent)', fontFamily: 'monospace' }}>{site?.id}</code>
-                {' '}(자동 등록)
-              </div>
+                  {/* GitHub Secrets 복사 */}
+                  <div style={{ padding: 12, background: 'var(--accent-bg)', borderRadius: 10, fontSize: 12, color: 'var(--accent)', fontWeight: 500 }}>
+                    2. Fork한 저장소 &rarr; Settings &rarr; Secrets and variables &rarr; Actions에 아래 3개를 추가하세요.
+                  </div>
+
+                  {[
+                    { name: 'SUPABASE_URL', value: process.env.NEXT_PUBLIC_SUPABASE_URL || '' },
+                    { name: 'SUPABASE_KEY', value: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+                    { name: 'SITE_ID', value: site?.id || '' },
+                  ].map(({ name, value }) => (
+                    <div key={name} style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 12px', background: 'var(--bg-secondary)', borderRadius: 8,
+                    }}>
+                      <code style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', minWidth: 110 }}>{name}</code>
+                      <code style={{
+                        flex: 1, fontSize: 10, color: 'var(--text-dim)', fontFamily: 'monospace',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {value.length > 30 ? value.slice(0, 15) + '...' + value.slice(-10) : value}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(value, name)}
+                        style={{
+                          border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                          fontSize: 11, fontWeight: 600, flexShrink: 0,
+                          background: copiedField === name ? 'var(--green)' : 'var(--accent)',
+                          color: '#fff',
+                        }}
+                      >
+                        {copiedField === name ? '복사됨' : '복사'}
+                      </button>
+                    </div>
+                  ))}
+
+                  <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 14, marginTop: 4 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+                      3. AI API 키 입력
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {!isCentral() && (
+                <div style={{ padding: 12, background: 'var(--accent-bg)', borderRadius: 10, fontSize: 12, color: 'var(--accent)', fontWeight: 500 }}>
+                  {'\uD83D\uDD11'} AI API 키를 입력하면 자동으로 설정됩니다.
+                </div>
+              )}
 
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, display: 'block', color: 'var(--text)' }}>
@@ -793,17 +876,14 @@ export default function SettingsPage() {
                     ? `${'\u2705'} ${ghSecretsResult.message}`
                     : `${'\u274C'} ${ghSecretsResult.error || ghSecretsResult.message}`
                   }
-                  {ghSecretsResult.guide && (
-                    <div style={{ marginTop: 4, fontSize: 11 }}>{ghSecretsResult.guide}</div>
-                  )}
                 </div>
               )}
 
               <ActionButton
                 onClick={registerGhSecrets}
-                disabled={ghSecretsSaving || !ghSecrets.DEEPSEEK_API_KEY.trim()}
+                disabled={ghSecretsSaving || !ghSecrets.DEEPSEEK_API_KEY.trim() || ghSecrets.DEEPSEEK_API_KEY === '********'}
               >
-                {ghSecretsSaving ? 'GitHub에 등록 중...' : 'GitHub Secrets 자동 등록'}
+                {ghSecretsSaving ? '저장 중...' : 'API 키 저장'}
               </ActionButton>
             </div>
           )}
@@ -813,7 +893,7 @@ export default function SettingsPage() {
 
       {/* ═══ STEP 3: Blog Setup + Launch ═══ */}
       <Card style={{ marginBottom: 20, opacity: siteConnected ? 1 : 0.5, pointerEvents: siteConnected ? 'auto' : 'none' }}>
-        <SectionTitle>STEP {isCentral() ? '2' : '3'} &mdash; 블로그 설정</SectionTitle>
+        <SectionTitle>STEP 3 &mdash; 블로그 설정</SectionTitle>
         {!siteConnected && (
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
             {'\uD83D\uDD12'} STEP 1에서 사이트를 먼저 연결해주세요.
