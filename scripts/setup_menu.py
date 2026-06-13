@@ -35,13 +35,13 @@ TARGET_CATEGORIES = [
 print("=== 카테고리 확인/생성 ===")
 cat_ids = {}
 for cat in TARGET_CATEGORIES:
-    resp = requests.get(f"{API}/categories", params={"slug": cat["slug"]}, headers=HEADERS, timeout=10)
+    resp = requests.get(f"{API}/categories", params={"slug": cat["slug"]}, headers=HEADERS, timeout=30)
     existing = resp.json()
     if existing and len(existing) > 0:
         cat_ids[cat["slug"]] = existing[0]["id"]
         print(f"  [OK] {cat['name']} (id={existing[0]['id']})")
     else:
-        resp = requests.post(f"{API}/categories", headers=HEADERS, json=cat, timeout=10)
+        resp = requests.post(f"{API}/categories", headers=HEADERS, json=cat, timeout=30)
         if resp.status_code == 201:
             cat_ids[cat["slug"]] = resp.json()["id"]
             print(f"  [NEW] {cat['name']} (id={resp.json()['id']})")
@@ -50,7 +50,7 @@ for cat in TARGET_CATEGORIES:
 
 # ── 2. 메뉴 확인 ──
 print("\n=== 메뉴 확인 ===")
-menus_resp = requests.get(f"{API}/menus", headers=HEADERS, timeout=10)
+menus_resp = requests.get(f"{API}/menus", headers=HEADERS, timeout=30)
 menu_id = None
 if menus_resp.status_code == 200:
     menus = menus_resp.json()
@@ -65,7 +65,7 @@ if not menu_id:
         f"{API}/menus",
         headers=HEADERS,
         json={"name": "Main Menu", "slug": "main-menu"},
-        timeout=10
+        timeout=30
     )
     if create_resp.status_code in (200, 201):
         menu_id = create_resp.json().get("id")
@@ -78,7 +78,7 @@ if not menu_id:
             f"{API}/navigation",
             headers=HEADERS,
             json={"title": "Main Menu", "slug": "main-menu", "status": "publish"},
-            timeout=10
+            timeout=30
         )
         if nav_resp.status_code in (200, 201):
             menu_id = nav_resp.json().get("id")
@@ -95,7 +95,7 @@ print(f"\n=== 기존 메뉴 아이템 삭제 (메뉴 {menu_id}) ===")
 for attempt in range(2):
     items_resp = requests.get(
         f"{API}/menu-items", params={"menus": menu_id, "per_page": 100},
-        headers=HEADERS, timeout=10
+        headers=HEADERS, timeout=30
     )
     if items_resp.status_code == 200:
         old_items = items_resp.json()
@@ -104,7 +104,7 @@ for attempt in range(2):
             break
         print(f"  {len(old_items)}개 삭제 중... (시도 {attempt+1})")
         for item in old_items:
-            del_resp = requests.delete(f"{API}/menu-items/{item['id']}?force=true", headers=HEADERS, timeout=10)
+            del_resp = requests.delete(f"{API}/menu-items/{item['id']}?force=true", headers=HEADERS, timeout=30)
             status = "OK" if del_resp.status_code in (200, 204) else f"ERR:{del_resp.status_code}"
             print(f"    [{status}] id={item['id']} {item.get('title', {}).get('rendered', '')}")
     else:
@@ -123,7 +123,7 @@ resp = requests.post(f"{API}/menu-items", headers=HEADERS, json={
     "menus": menu_id,
     "type": "custom",
     "menu_order": 1,
-}, timeout=10)
+}, timeout=30)
 print(f"  [{'OK' if resp.status_code in (200, 201) else 'ERR'}] 홈 (status={resp.status_code})")
 
 # 카테고리 아이템
@@ -142,7 +142,7 @@ for i, cat in enumerate(TARGET_CATEGORIES, start=2):
         "object_id": cat_ids[slug],
         "menu_order": i,
     }
-    resp = requests.post(f"{API}/menu-items", headers=HEADERS, json=item_data, timeout=10)
+    resp = requests.post(f"{API}/menu-items", headers=HEADERS, json=item_data, timeout=30)
 
     if resp.status_code not in (200, 201):
         # custom 링크로 폴백
@@ -154,15 +154,69 @@ for i, cat in enumerate(TARGET_CATEGORIES, start=2):
             "type": "custom",
             "menu_order": i,
         }
-        resp = requests.post(f"{API}/menu-items", headers=HEADERS, json=item_data, timeout=10)
+        resp = requests.post(f"{API}/menu-items", headers=HEADERS, json=item_data, timeout=30)
 
     print(f"  [{'OK' if resp.status_code in (200, 201) else 'ERR'}] {cat['name']} (order={i})")
+
+# ── 4.5 필수 페이지 메뉴 추가 (AdSense 승인 요건) ──
+# 소개/개인정보처리방침/문의 등은 애드센스 심사 시 반드시 쉽게 찾을 수 있어야 함.
+print("\n=== 필수 페이지 메뉴 추가 ===")
+ESSENTIAL_SLUGS = ["about", "privacy-policy", "contact", "disclaimer", "terms-of-use"]
+
+pages_by_slug = {}
+pages_resp = requests.get(
+    f"{API}/pages",
+    params={"per_page": 100, "status": "publish", "_fields": "id,title,slug,link"},
+    headers=HEADERS, timeout=30,
+)
+if pages_resp.status_code == 200:
+    for pg in pages_resp.json():
+        pages_by_slug[pg.get("slug")] = pg
+else:
+    print(f"  페이지 조회 실패: {pages_resp.status_code} — 필수 페이지 메뉴 건너뜀")
+
+# 홈(1) + 카테고리들 다음 순번부터 시작
+order = len(TARGET_CATEGORIES) + 2
+for slug in ESSENTIAL_SLUGS:
+    pg = pages_by_slug.get(slug)
+    if not pg:
+        print(f"  [SKIP] '{slug}' 페이지 없음")
+        continue
+
+    title = (pg.get("title") or {}).get("rendered") or slug
+
+    # post_type(page) 아이템으로 시도
+    item_data = {
+        "title": title,
+        "status": "publish",
+        "menus": menu_id,
+        "type": "post_type",
+        "object": "page",
+        "object_id": pg["id"],
+        "menu_order": order,
+    }
+    resp = requests.post(f"{API}/menu-items", headers=HEADERS, json=item_data, timeout=30)
+
+    if resp.status_code not in (200, 201):
+        # custom 링크로 폴백
+        item_data = {
+            "title": title,
+            "url": pg.get("link") or f"{WP_URL}/{slug}/",
+            "status": "publish",
+            "menus": menu_id,
+            "type": "custom",
+            "menu_order": order,
+        }
+        resp = requests.post(f"{API}/menu-items", headers=HEADERS, json=item_data, timeout=30)
+
+    print(f"  [{'OK' if resp.status_code in (200, 201) else 'ERR'}] {title} (order={order})")
+    order += 1
 
 # ── 5. 최종 확인 ──
 print(f"\n=== 최종 메뉴 (ID={menu_id}) ===")
 final = requests.get(
     f"{API}/menu-items", params={"menus": menu_id, "per_page": 50},
-    headers=HEADERS, timeout=10
+    headers=HEADERS, timeout=30
 )
 if final.status_code == 200:
     items = sorted(final.json(), key=lambda x: x.get("menu_order", 0))

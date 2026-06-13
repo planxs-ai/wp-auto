@@ -112,7 +112,8 @@ jobs:
     if: >-
       github.repository == 'planxs-ai/wp-auto'
       && (github.event_name == 'workflow_dispatch'
-      || github.event_name == 'schedule' && (github.event.schedule == '0 23 * * *' || github.event.schedule == '0 11 * * *'))
+      || github.event_name == 'schedule' && github.event.schedule == '0 23 * * *')
+      # AdSense 심사 감속(2026-06): 하루 1편만 발행. 승인 후 '0 11 * * *' 조건 복원.
 
     env:
       ALLOWED_SITE_IDS: "site-1,site-1775046458524"
@@ -197,7 +198,8 @@ jobs:
     if: >-
       github.repository == 'planxs-ai/wp-auto'
       && (github.event_name == 'workflow_dispatch'
-      || github.event_name == 'schedule' && (github.event.schedule == '30 23 * * *' || github.event.schedule == '30 3 * * *' || github.event.schedule == '30 10 * * *'))
+      || github.event_name == 'schedule' && github.event.schedule == '30 23 * * *')
+      # AdSense 심사 감속(2026-06): 하루 1편만 발행. 승인 후 '30 3'·'30 10' 조건 복원.
 
     env:
       ALLOWED_SITE_IDS: "site-1,site-1775046458524"
