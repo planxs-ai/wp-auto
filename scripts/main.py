@@ -1273,16 +1273,18 @@ class ContentGenerator:
         draft = None
         draft_model = None
 
-        # 대시보드에서 선택한 모델을 1순위로 시도
-        # 기본 초안 체인: Grok → DeepSeek (Gemini는 무료 종료로 제외, 2026-06)
+        # 초안 모델: DeepSeek 단독 운영 (2026-06 — Grok 크레딧 없음 / Gemini 무료 종료).
+        # 복구 시 ENABLED_DRAFT_MODELS에 "grok"/"gemini" 추가하면 우선 사용됨.
+        ENABLED_DRAFT_MODELS = []  # 예: ["grok"] — 크레딧/키 복구 시 활성화
         model_chain = []
-        if preferred_draft and preferred_draft not in ("deepseek", "deepseek-chat"):
+        # 죽은 모델(grok/gemini)이 사이트 config에 남아 있어도 헛호출하지 않도록,
+        # preferred_draft는 활성 목록에 있을 때만 1순위로 인정.
+        if preferred_draft and preferred_draft in ENABLED_DRAFT_MODELS:
             model_chain.append(preferred_draft)
-        for m in ["grok"]:
+        for m in ENABLED_DRAFT_MODELS:
             if m not in model_chain:
                 model_chain.append(m)
-        # 폴백: Grok이 실패해도 발행이 0편으로 끊기지 않도록 DeepSeek를 최후순위로 추가
-        # (환각은 Claude 폴리싱 + 출처 링크 규칙으로 2차 검증).
+        # DeepSeek 기본 초안 모델 (환각은 Claude 폴리싱 + 출처 링크 규칙으로 2차 검증).
         if DEEPSEEK_KEY and "deepseek" not in model_chain:
             model_chain.append("deepseek")
 
@@ -1293,9 +1295,7 @@ class ContentGenerator:
                 draft, draft_model = self._call_grok(prompt)
             elif model_id in ("gemini", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash") and GEMINI_KEY:
                 draft, draft_model = self._call_gemini(prompt)
-            # DeepSeek는 최후 폴백 — Grok·Gemini가 모두 초안을 못 만든 경우에만 사용.
             elif model_id in ("deepseek", "deepseek-chat") and DEEPSEEK_KEY:
-                log.warning("⚠️ Grok·Gemini 초안 실패 → DeepSeek 비상 폴백 사용")
                 draft, draft_model = self._call_deepseek(prompt)
 
         if not draft:
