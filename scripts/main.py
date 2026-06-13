@@ -1274,15 +1274,15 @@ class ContentGenerator:
         draft_model = None
 
         # 대시보드에서 선택한 모델을 1순위로 시도
-        # 기본 초안 체인: Grok → Gemini (DeepSeek는 환각 이슈로 평상시 제외)
+        # 기본 초안 체인: Grok → DeepSeek (Gemini는 무료 종료로 제외, 2026-06)
         model_chain = []
         if preferred_draft and preferred_draft not in ("deepseek", "deepseek-chat"):
             model_chain.append(preferred_draft)
-        for m in ["grok", "gemini"]:
+        for m in ["grok"]:
             if m not in model_chain:
                 model_chain.append(m)
-        # 비상 폴백: Grok·Gemini가 모두 실패해도 발행이 0편으로 끊기지 않도록
-        # DeepSeek를 최후순위로 추가 (환각은 Claude 폴리싱 + 출처 링크 규칙으로 2차 검증).
+        # 폴백: Grok이 실패해도 발행이 0편으로 끊기지 않도록 DeepSeek를 최후순위로 추가
+        # (환각은 Claude 폴리싱 + 출처 링크 규칙으로 2차 검증).
         if DEEPSEEK_KEY and "deepseek" not in model_chain:
             model_chain.append("deepseek")
 
