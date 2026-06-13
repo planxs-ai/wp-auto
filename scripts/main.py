@@ -1274,14 +1274,17 @@ class ContentGenerator:
         draft_model = None
 
         # 대시보드에서 선택한 모델을 1순위로 시도
-        # DeepSeek는 hex 해시 환각 이슈로 초안 체인에서 제외 (Grok → Gemini 순)
+        # 기본 초안 체인: Grok → Gemini (DeepSeek는 환각 이슈로 평상시 제외)
         model_chain = []
         if preferred_draft and preferred_draft not in ("deepseek", "deepseek-chat"):
             model_chain.append(preferred_draft)
-        # 기본 폴체인: Grok 우선 → Gemini 폴백 (DeepSeek 제외)
         for m in ["grok", "gemini"]:
             if m not in model_chain:
                 model_chain.append(m)
+        # 비상 폴백: Grok·Gemini가 모두 실패해도 발행이 0편으로 끊기지 않도록
+        # DeepSeek를 최후순위로 추가 (환각은 Claude 폴리싱 + 출처 링크 규칙으로 2차 검증).
+        if DEEPSEEK_KEY and "deepseek" not in model_chain:
+            model_chain.append("deepseek")
 
         for model_id in model_chain:
             if draft:
@@ -1290,8 +1293,9 @@ class ContentGenerator:
                 draft, draft_model = self._call_grok(prompt)
             elif model_id in ("gemini", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash") and GEMINI_KEY:
                 draft, draft_model = self._call_gemini(prompt)
-            # DeepSeek는 초안 체인에서 제외 (환각 이슈). 비상시에만 수동 활성화.
-            elif model_id in ("deepseek", "deepseek-chat") and DEEPSEEK_KEY and os.environ.get("ALLOW_DEEPSEEK") == "1":
+            # DeepSeek는 최후 폴백 — Grok·Gemini가 모두 초안을 못 만든 경우에만 사용.
+            elif model_id in ("deepseek", "deepseek-chat") and DEEPSEEK_KEY:
+                log.warning("⚠️ Grok·Gemini 초안 실패 → DeepSeek 비상 폴백 사용")
                 draft, draft_model = self._call_deepseek(prompt)
 
         if not draft:
