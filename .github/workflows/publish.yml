@@ -109,11 +109,11 @@ jobs:
   planx-ai:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # AdSense 심사 감속(2026-06): 하루 1편만 발행(KST 08:00). 승인 후 '0 11 * * *' 스케줄 조건 복원.
     if: >-
       github.repository == 'planxs-ai/wp-auto'
       && (github.event_name == 'workflow_dispatch'
       || github.event_name == 'schedule' && github.event.schedule == '0 23 * * *')
-      # AdSense 심사 감속(2026-06): 하루 1편만 발행. 승인 후 '0 11 * * *' 조건 복원.
 
     env:
       ALLOWED_SITE_IDS: "site-1,site-1775046458524"
@@ -195,11 +195,11 @@ jobs:
   bomissu:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # AdSense 심사 감속(2026-06): 하루 1편만 발행(KST 08:30). 승인 후 '30 3'·'30 10' 스케줄 조건 복원.
     if: >-
       github.repository == 'planxs-ai/wp-auto'
       && (github.event_name == 'workflow_dispatch'
       || github.event_name == 'schedule' && github.event.schedule == '30 23 * * *')
-      # AdSense 심사 감속(2026-06): 하루 1편만 발행. 승인 후 '30 3'·'30 10' 조건 복원.
 
     env:
       ALLOWED_SITE_IDS: "site-1,site-1775046458524"
