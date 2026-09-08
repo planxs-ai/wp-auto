@@ -1,0 +1,78 @@
+name: Deals — 쿠팡 가격 스냅샷·딜 발행
+
+# 스냅샷: 매시간(KST 07~23시) · 관찰 키워드 검색 포함 일 1회(KST 07시) · 발행: KST 09/13/19시
+# 밑그림 §9. 잡 타임아웃(20분) > hard(15분) > soft(12분) — 셋을 함께 바꾼다.
+on:
+  schedule:
+    - cron: '5 22 * * *'          # KST 07:05 — daily(검색 포함)
+    - cron: '5 23,0-14 * * *'     # KST 08:05~23:05 — hourly
+    - cron: '10 0 * * *'          # KST 09:10 — publish
+    - cron: '10 4 * * *'          # KST 13:10 — publish
+    - cron: '10 10 * * *'         # KST 19:10 — publish
+  workflow_dispatch:
+    inputs:
+      command:
+        description: '실행할 명령'
+        type: choice
+        default: selftest
+        options: [selftest, snapshot, publish, report]
+      mode:
+        description: 'snapshot 모드'
+        type: choice
+        default: hourly
+        options: [hourly, daily]
+      dry_run:
+        description: 'publish 드라이런(발행 없이 판정만)'
+        type: choice
+        default: 'true'
+        options: ['true', 'false']
+
+concurrency:
+  group: deals-engine           # 겹침 방지(대기, 취소 아님)
+  cancel-in-progress: false
+
+jobs:
+  deals:
+    if: github.repository == 'planxs-ai/wp-auto'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      COUPANG_ACCESS_KEY: ${{ secrets.COUPANG_ACCESS_KEY }}
+      COUPANG_SECRET_KEY: ${{ secrets.COUPANG_SECRET_KEY }}
+      COUPANG_SUB_ID: ${{ secrets.COUPANG_SUB_ID }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      WP_URL: ${{ secrets.DEALS_WP_URL || secrets.WP_URL }}
+      WP_USERNAME: ${{ secrets.DEALS_WP_USERNAME || secrets.WP_USERNAME }}
+      WP_APP_PASSWORD: ${{ secrets.DEALS_WP_APP_PASSWORD || secrets.WP_APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: 명령 결정
+        id: pick
+        run: |
+          S="${{ github.event.schedule }}"
+          if [ -n "${{ github.event.inputs.command }}" ]; then
+            echo "cmd=${{ github.event.inputs.command }}" >> $GITHUB_OUTPUT
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+            echo "dry=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+          elif [ "$S" = "5 22 * * *" ]; then
+            echo "cmd=snapshot" >> $GITHUB_OUTPUT; echo "mode=daily" >> $GITHUB_OUTPUT
+          elif [ "$S" = "10 0 * * *" ] || [ "$S" = "10 4 * * *" ] || [ "$S" = "10 10 * * *" ]; then
+            echo "cmd=publish" >> $GITHUB_OUTPUT; echo "dry=false" >> $GITHUB_OUTPUT
+          else
+            echo "cmd=snapshot" >> $GITHUB_OUTPUT; echo "mode=hourly" >> $GITHUB_OUTPUT
+          fi
+      - name: 실행 (신호가 파이썬에 도달하도록 timeout으로 감싼다)
+        run: |
+          CMD="${{ steps.pick.outputs.cmd }}"
+          ARGS="$CMD"
+          [ "$CMD" = "snapshot" ] && ARGS="$ARGS --mode ${{ steps.pick.outputs.mode }}"
+          [ "$CMD" = "publish" ] && [ "${{ steps.pick.outputs.dry }}" = "true" ] && ARGS="$ARGS --dry-run"
+          echo "▶ python -m deals.run $ARGS"
+          exec timeout --signal=TERM --kill-after=60s 17m python -m deals.run $ARGS
