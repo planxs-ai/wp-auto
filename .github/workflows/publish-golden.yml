@@ -24,6 +24,10 @@ on:
         required: false
         default: ''
 
+# 편집자가 WordPress에서 확인 후 공개. 예약 실행도 초안만 저장합니다.
+env:
+  EDITORIAL_REVIEW_REQUIRED: "true"
+
 permissions:
   contents: write
 

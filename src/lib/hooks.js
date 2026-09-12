@@ -84,7 +84,7 @@ export function useRecentPosts(siteId, limit = 20) {
       .from('publish_logs')
       .select('*')
       .eq('site_id', siteId)
-      .order('published_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(limit);
     setPosts(data || []);
     setLoading(false);

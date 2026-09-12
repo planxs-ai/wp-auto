@@ -11,3 +11,6 @@ node_modules/
 
 # Screenshots
 *.png
+
+.private-backups/
+/remediation-plan.json
