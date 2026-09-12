@@ -24,6 +24,8 @@ permissions:
 
 jobs:
   etf-report:
+    # Pause this repository's scheduled publishing during editorial remediation.
+    if: github.repository != 'planxs-ai/wp-auto' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

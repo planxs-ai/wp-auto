@@ -109,11 +109,10 @@ jobs:
   planx-ai:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # AdSense 심사 감속(2026-06): 하루 1편만 발행(KST 08:00). 승인 후 '0 11 * * *' 스케줄 조건 복원.
+    # AdSense 콘텐츠 정비 중 예약 발행 중지. 검토 후 수동 실행만 허용.
     if: >-
       github.repository == 'planxs-ai/wp-auto'
-      && (github.event_name == 'workflow_dispatch'
-      || github.event_name == 'schedule' && github.event.schedule == '0 23 * * *')
+      && github.event_name == 'workflow_dispatch'
 
     env:
       ALLOWED_SITE_IDS: "site-1,site-1775046458524"
