@@ -1,328 +1,53 @@
 #!/usr/bin/env python3
-"""
-WordPress 필수 페이지 자동 생성 (AdSense 승인 필수)
-- About (소개)
-- Privacy Policy (개인정보처리방침)
-- Contact (문의)
-"""
-import os, sys, base64, json
-
-WP_URL = os.environ.get("WP_URL", "").rstrip("/")
-WP_USER = os.environ.get("WP_USERNAME", "")
-WP_PASS = os.environ.get("WP_APP_PASSWORD", "")
-SITE_ID = os.environ.get("SITE_ID", "")
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-
-if not all([WP_URL, WP_USER, WP_PASS]):
-    print("ERROR: WP_URL, WP_USERNAME, WP_APP_PASSWORD 환경변수 필요")
-    sys.exit(1)
-
+"""Create missing information drafts; never overwrite existing pages."""
+import base64
+import os
+from urllib.parse import urlparse
 import requests
-
-# ── Supabase에서 기본정보 로드 (dashboard_config) ──
-BLOG_OWNER = os.environ.get("BLOG_OWNER", "")
-BLOG_DESC = os.environ.get("BLOG_DESC", "")
-CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
-
-if SUPABASE_URL and SUPABASE_KEY and SITE_ID:
-    print(f"  Supabase 조회 시도 (site_id={SITE_ID})...")
-    try:
-        from urllib.parse import quote
-        safe_id = quote(SITE_ID, safe='')
-        url = f"{SUPABASE_URL}/rest/v1/dashboard_config?site_id=eq.{safe_id}&select=config"
-        resp = requests.get(
-            url,
-            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
-            timeout=10
-        )
-        print(f"  Supabase 응답: {resp.status_code}")
-        rows = resp.json()
-        print(f"  결과: {len(rows)}건")
-        if rows and len(rows) > 0:
-            cfg = rows[0].get("config", {})
-            print(f"  config 키: {list(cfg.keys())}")
-            BLOG_OWNER = cfg.get("blog_owner", "") or BLOG_OWNER
-            BLOG_DESC = cfg.get("blog_desc", "") or BLOG_DESC
-            CONTACT_EMAIL = cfg.get("contact_email", "") or CONTACT_EMAIL
-            print(f"  로드 완료: owner='{BLOG_OWNER}', email='{CONTACT_EMAIL}'")
-        else:
-            print(f"  dashboard_config에 site_id={SITE_ID} 데이터 없음")
-    except Exception as e:
-        print(f"  Supabase 조회 실패: {e}")
-else:
-    missing = []
-    if not SUPABASE_URL: missing.append("SUPABASE_URL")
-    if not SUPABASE_KEY: missing.append("SUPABASE_KEY")
-    if not SITE_ID: missing.append("SITE_ID")
-    print(f"  Supabase 조회 스킵 — 누락: {', '.join(missing)}")
-
-# 최종 폴백
-if not BLOG_OWNER:
-    BLOG_OWNER = "블로그 운영자"
-if not BLOG_DESC:
-    BLOG_DESC = "유용한 정보를 공유하는 블로그입니다"
-if not CONTACT_EMAIL:
-    CONTACT_EMAIL = "contact@example.com"
-
-cred = base64.b64encode(f"{WP_USER}:{WP_PASS}".encode()).decode()
-HEADERS = {
-    "Authorization": f"Basic {cred}",
-    "Content-Type": "application/json",
-    "User-Agent": "AutoBlog/1.0",
-}
-API = f"{WP_URL}/wp-json/wp/v2"
-
-domain = WP_URL.replace("https://", "").replace("http://", "").split("/")[0]
-
-
-# ── Page Templates ──
-
-def about_page():
-    return {
-        "title": "About",
-        "slug": "about",
-        "content": f"""
-<h2>블로그 소개</h2>
-<p>{BLOG_DESC}</p>
-<p>이 블로그는 <strong>검증된 정보</strong>와 <strong>실용적인 팁</strong>을 제공하여
-독자 여러분의 일상에 실질적인 도움을 드리고자 합니다.</p>
-
-<h2>운영자 소개</h2>
-<p>안녕하세요, <strong>{BLOG_OWNER}</strong>입니다.</p>
-<p>다양한 분야의 전문 지식과 실제 경험을 바탕으로, 독자 여러분이 더 나은 선택을 할 수 있도록
-정확하고 유용한 콘텐츠를 작성하고 있습니다.</p>
-
-<h2>콘텐츠 원칙</h2>
-<ul>
-<li><strong>정확성</strong>: 모든 정보는 공식 출처와 데이터를 기반으로 합니다</li>
-<li><strong>실용성</strong>: 바로 실행할 수 있는 구체적인 방법을 제시합니다</li>
-<li><strong>투명성</strong>: 광고와 후원 콘텐츠는 명확히 표시합니다</li>
-</ul>
-
-<h2>문의</h2>
-<p>콘텐츠에 대한 질문이나 제안은 <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>으로 보내주세요.</p>
-""",
-        "status": "publish",
-    }
-
-
-def privacy_page():
-    return {
-        "title": "Privacy Policy",
-        "slug": "privacy-policy",
-        "content": f"""
-<h2>개인정보처리방침</h2>
-<p><strong>{domain}</strong> (이하 "사이트")은 방문자의 개인정보를 중요하게 생각하며,
-아래와 같이 개인정보를 처리하고 있습니다.</p>
-
-<h3>1. 수집하는 개인정보</h3>
-<p>본 사이트는 기본적으로 개인정보를 직접 수집하지 않습니다.
-다만, 아래 서비스를 통해 자동으로 수집될 수 있습니다:</p>
-<ul>
-<li><strong>Google Analytics</strong>: 방문 통계 (IP 주소, 브라우저 정보, 페이지 조회)</li>
-<li><strong>Google AdSense</strong>: 맞춤형 광고를 위한 쿠키</li>
-<li><strong>댓글 시스템</strong>: 이름, 이메일 (선택적 입력)</li>
-</ul>
-
-<h3>2. 쿠키 사용</h3>
-<p>본 사이트는 Google AdSense 및 Analytics 목적으로 쿠키를 사용합니다.
-브라우저 설정에서 쿠키를 비활성화할 수 있으나, 일부 기능이 제한될 수 있습니다.</p>
-
-<h3>3. 제3자 제공</h3>
-<p>수집된 정보는 법적 요구가 있는 경우를 제외하고 제3자에게 제공하지 않습니다.</p>
-
-<h3>4. 광고</h3>
-<p>본 사이트는 Google AdSense를 통해 광고를 게재합니다.
-Google은 사용자의 관심사에 기반한 광고를 표시하기 위해 쿠키를 사용할 수 있습니다.
-자세한 내용은 <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener">Google 광고 정책</a>을 참조하세요.</p>
-
-<h3>5. 제휴 링크</h3>
-<p>일부 콘텐츠에는 제휴 마케팅 링크가 포함될 수 있으며,
-이를 통한 구매 시 사이트 운영에 도움이 되는 소정의 수수료를 받을 수 있습니다.
-제휴 링크가 포함된 콘텐츠는 별도로 표시합니다.</p>
-
-<h3>6. 문의</h3>
-<p>개인정보와 관련된 문의는 <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>으로 연락해주세요.</p>
-
-<p><em>최종 업데이트: 2026년</em></p>
-""",
-        "status": "publish",
-    }
-
-
-def contact_page():
-    return {
-        "title": "Contact",
-        "slug": "contact",
-        "content": f"""
-<h2>문의하기</h2>
-<p>블로그 콘텐츠에 대한 질문, 제안, 협업 문의 등 무엇이든 환영합니다.</p>
-
-<h3>이메일</h3>
-<p><a href="mailto:{CONTACT_EMAIL}"><strong>{CONTACT_EMAIL}</strong></a></p>
-
-<h3>문의 유형</h3>
-<ul>
-<li><strong>콘텐츠 문의</strong>: 글 내용에 대한 질문이나 정정 요청</li>
-<li><strong>협업 제안</strong>: 광고, 협찬, 기고 등 비즈니스 문의</li>
-<li><strong>기술 문의</strong>: 사이트 이용 관련 기술적 문제</li>
-</ul>
-
-<p>보내주신 메일은 영업일 기준 <strong>1~2일 이내</strong>에 답변드리겠습니다.</p>
-
-<h3>운영 정보</h3>
-<p>운영자: {BLOG_OWNER}<br/>
-사이트: {domain}</p>
-""",
-        "status": "publish",
-    }
-
-
-def disclaimer_page():
-    return {
-        "title": "Disclaimer",
-        "slug": "disclaimer",
-        "content": f"""
-<h2>면책 고지 (Disclaimer)</h2>
-<h3>정보의 정확성</h3>
-<p><strong>{domain}</strong>에서 제공하는 정보는 참고 목적으로 제공되며,
-정확성이나 완전성을 보장하지 않습니다. 중요한 의사결정 시에는 반드시
-전문가의 조언을 구하시기 바랍니다.</p>
-
-<h3>투자 관련 면책</h3>
-<p>본 사이트에 게시된 투자, 재테크, 금융 관련 정보는 일반적인 정보 제공 목적이며,
-특정 금융 상품이나 투자를 권유하는 것이 아닙니다. 투자 결정은 본인의 판단과
-책임하에 이루어져야 합니다.</p>
-
-<h3>제휴 링크 고지</h3>
-<p>이 사이트의 일부 링크는 제휴(어필리에이트) 링크입니다.
-이러한 링크를 통해 제품을 구매하시면 사이트 운영에 도움이 되는
-소정의 수수료를 받을 수 있습니다. 제휴 링크의 존재가 콘텐츠의 객관성에
-영향을 미치지 않습니다.</p>
-
-<h3>외부 링크</h3>
-<p>본 사이트는 외부 웹사이트로의 링크를 포함할 수 있으며,
-해당 사이트의 콘텐츠나 개인정보 처리에 대해 책임지지 않습니다.</p>
-
-<h3>문의</h3>
-<p>면책 고지에 대한 문의는 <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>으로 연락해주세요.</p>
-
-<p><em>최종 업데이트: 2026년</em></p>
-""",
-        "status": "publish",
-    }
-
-
-def terms_page():
-    return {
-        "title": "Terms of Use",
-        "slug": "terms-of-use",
-        "content": f"""
-<h2>이용약관</h2>
-<p><strong>{domain}</strong>(이하 "사이트")을 이용하시기 전에 본 이용약관을 주의 깊게 읽어주세요.
-사이트에 접속하거나 이용하는 것은 본 약관에 동의하는 것으로 간주됩니다.</p>
-
-<h3>1. 서비스 이용</h3>
-<p>본 사이트는 정보 제공을 목적으로 운영되며, 이용자는 관련 법령과
-본 약관을 준수하여 사이트를 이용해야 합니다.</p>
-
-<h3>2. 지적재산권</h3>
-<p>사이트에 게시된 모든 콘텐츠(텍스트, 이미지, 그래픽 등)의 저작권은
-사이트 운영자 또는 원저작자에게 있습니다. 무단 복제, 배포, 수정을 금합니다.</p>
-
-<h3>3. 이용 제한</h3>
-<ul>
-<li>사이트의 정상적인 운영을 방해하는 행위</li>
-<li>타인의 개인정보를 무단으로 수집하는 행위</li>
-<li>자동화된 수단(봇, 스크래퍼 등)으로 콘텐츠를 대량 수집하는 행위</li>
-</ul>
-
-<h3>4. 면책사항</h3>
-<p>사이트에서 제공하는 정보의 정확성, 완전성에 대해 보장하지 않으며,
-이용자가 해당 정보를 활용하여 발생한 손해에 대해 책임지지 않습니다.
-자세한 내용은 <a href="/disclaimer">면책 고지</a>를 참조하세요.</p>
-
-<h3>5. 약관 변경</h3>
-<p>본 약관은 사전 고지 없이 변경될 수 있으며,
-변경된 약관은 사이트에 게시된 시점부터 효력이 발생합니다.</p>
-
-<h3>6. 문의</h3>
-<p>약관에 대한 문의는 <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>으로 연락해주세요.</p>
-
-<p><em>최종 업데이트: 2026년</em></p>
-""",
-        "status": "publish",
-    }
-
-
-# ── Create or Update Pages ──
-
-PAGES = [about_page, privacy_page, contact_page, disclaimer_page, terms_page]
-
-
-def find_page_by_slug(slug):
-    """slug로 기존 페이지 검색"""
-    resp = requests.get(
-        f"{API}/pages", params={"slug": slug, "status": "any"},
-        headers=HEADERS, timeout=10
-    )
-    if resp.status_code == 200:
-        pages = resp.json()
-        if pages:
-            return pages[0]
-    return None
-
-
-def create_or_update_page(page_data):
-    """페이지 생성 또는 업데이트"""
-    slug = page_data["slug"]
-    existing = find_page_by_slug(slug)
-
-    if existing:
-        # Update existing
-        resp = requests.post(
-            f"{API}/pages/{existing['id']}",
-            headers=HEADERS, json={
-                "content": page_data["content"],
-                "status": "publish",
-            }, timeout=15
-        )
-        if resp.status_code == 200:
-            print(f"  [UPDATE] {page_data['title']} (id={existing['id']})")
-            return True
-        else:
-            print(f"  [ERR] {page_data['title']} update failed: {resp.status_code} {resp.text[:200]}")
-            return False
-    else:
-        # Create new
-        resp = requests.post(
-            f"{API}/pages", headers=HEADERS, json=page_data, timeout=15
-        )
-        if resp.status_code == 201:
-            print(f"  [NEW] {page_data['title']} (id={resp.json()['id']})")
-            return True
-        else:
-            print(f"  [ERR] {page_data['title']} create failed: {resp.status_code} {resp.text[:200]}")
-            return False
+try:
+    from .editorial_pages import build_pages, create_missing_drafts
+except ImportError:
+    from editorial_pages import build_pages, create_missing_drafts
 
 
 def main():
-    print(f"=== 필수 페이지 생성 ({domain}) ===")
-    print(f"  운영자: {BLOG_OWNER}")
-    print(f"  이메일: {CONTACT_EMAIL}")
-    print()
+    url = os.environ.get('WP_URL', '').rstrip('/')
+    user = os.environ.get('WP_USERNAME', '')
+    password = os.environ.get('WP_APP_PASSWORD', '')
+    parsed = urlparse(url)
+    if not user or not password or parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+        print('HTTPS WP_URL 및 WordPress 환경변수를 확인하세요. 값은 출력하지 않습니다.')
+        return 1
+    owner = os.environ.get('BLOG_OWNER', '')
+    description = os.environ.get('BLOG_DESC', '')
+    email = os.environ.get('CONTACT_EMAIL', '')
+    sb_url, sb_key, site_id = (os.environ.get(k, '') for k in ('SUPABASE_URL', 'SUPABASE_KEY', 'SITE_ID'))
+    if sb_url and sb_key and site_id:
+        try:
+            response = requests.get(f"{sb_url.rstrip('/')}/rest/v1/dashboard_config",
+                                    headers={'apikey': sb_key, 'Authorization': f'Bearer {sb_key}'},
+                                    params={'site_id': f'eq.{site_id}', 'select': 'config'}, timeout=15)
+            response.raise_for_status()
+            rows = response.json()
+            cfg = rows[0].get('config', {}) if isinstance(rows, list) and rows else {}
+            owner = owner or cfg.get('blog_owner', '')
+            description = description or cfg.get('blog_desc', '')
+            email = email or cfg.get('contact_email', '')
+        except (requests.RequestException, ValueError, TypeError, AttributeError):
+            print('사이트 정보 조회 실패. 페이지를 변경하지 않았습니다.')
+            return 1
+    try:
+        pages = build_pages(parsed.hostname, owner, description, email)
+    except ValueError as error:
+        print(str(error))
+        return 1
+    cred = base64.b64encode(f'{user}:{password}'.encode()).decode()
+    created, skipped, failed = create_missing_drafts(
+        url, {'Authorization': f'Basic {cred}', 'Content-Type': 'application/json'}, pages, requests)
+    print(f'초안 {len(created)} / 기존 유지 {len(skipped)} / 실패 {len(failed)}')
+    print('WordPress에서 실제 운영정보와 개인정보 처리 현황을 확인한 뒤 공개하세요.')
+    return 1 if failed else 0
 
-    success = 0
-    for page_fn in PAGES:
-        page_data = page_fn()
-        if create_or_update_page(page_data):
-            success += 1
 
-    print(f"\n=== 완료: {success}/{len(PAGES)} 페이지 ===")
-    if success < len(PAGES):
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    raise SystemExit(main())

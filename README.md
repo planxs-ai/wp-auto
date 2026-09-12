@@ -29,3 +29,14 @@ python scripts/main.py --count 3
 # 드라이런 (발행 없이 테스트)
 python scripts/main.py --count 1 --dry-run
 ```
+
+## 애드센스 심사 준비
+
+자동 생성 글은 기본적으로 WordPress **초안**으로 저장합니다. 공개는 WordPress에서 근거를 확인한 후 진행하세요. 내부 품질 점수는 사실 확인이나 Google 승인 판정이 아닙니다.
+
+- [변경 범위·적용 순서·현재 미검증 항목](docs/adsense-readiness.md)
+- 회귀 테스트: `python -m unittest discover -s tests -v`
+- 공개 글 점검: `python scripts/audit_adsense.py --url https://planx-ai.com`
+- 페이지 생성: `python scripts/setup_pages.py` (기존 페이지 보존, 누락된 정보 페이지 초안만 생성)
+- 페이지 초안에 필요한 환경변수: `WP_URL`, `WP_USERNAME`, `WP_APP_PASSWORD`, `BLOG_OWNER`, `BLOG_DESC`, `CONTACT_EMAIL`. 대시보드 운영정보 연동은 `SITE_ID`, `SUPABASE_URL`, `SUPABASE_KEY`를 사용합니다.
+- `--dry-run`은 공개를 생략하지만 AI 생성 등 읽기/API 호출 비용은 발생할 수 있습니다.

@@ -112,18 +112,7 @@ class KeywordManager:
                     log.info(f"🤖 AI 동적 키워드 {len(ai_keywords)}개 생성 ({ai_niche})")
                     available.extend(ai_keywords)
 
-            # 2차: 그래도 부족하면 used 초기화 후 재활용
-            if len(available) < count and len(pool) > 0:
-                pipeline_pool = [kw for kw in pool
-                                if kw.get("pipeline", "autoblog") == pipeline
-                                and (not niche or kw.get("category", "") == niche)]
-                if pipeline_pool:
-                    log.info(f"♻️ 키워드 재활용 (재사용 {len(pipeline_pool)}개)")
-                    recycle_kws = {kw.get("keyword") for kw in pipeline_pool}
-                    self.used = [u for u in self.used if u not in recycle_kws]
-                    self._save_used()
-                    recycled = [kw for kw in pipeline_pool if kw not in available]
-                    available.extend(recycled)
+            # 소진된 키워드는 자동 재활용하지 않는다. 기존 글 갱신은 편집자가 판단한다.
 
         if len(available) < count:
             log.warning(f"가용 키워드 {len(available)}개 (요청 {count}개)")
@@ -277,8 +266,8 @@ NICHE_STYLES = {
     "product": {
         "label": "제품 리뷰/비교",
         "tone": (
-            "직접 써본 사람의 생생한 경험담 톤. "
-            "'실제로 2주간 사용해보니' 같은 체험 기반 서술. "
+            "공개 자료의 비교 근거를 차분하게 설명하는 톤. "
+            "제공된 실사용 기록이 없으면 체험을 주장하지 않는다. "
             "스펙 나열보다 '그래서 내 생활이 어떻게 바뀌었는지'에 집중."
         ),
         "value_focus": "돈 아끼기(가성비/최저가) + 시간 절약(비교 대신 해줌) + 남들이 모르는 숨은 기능",
@@ -368,7 +357,7 @@ NICHE_STYLES = {
         "label": "생활경제 라이프스타일",
         "tone": (
             "친한 언니/오빠가 알려주는 톤. 부드럽고 따뜻하지만 정확한 정보. "
-            "'이건 내가 직접 해봤는데' 같은 경험 기반 서술. "
+            "개인 경험은 제공된 기록이 있을 때만 인용한다. "
             "어려운 용어는 쉽게 풀어주고, 실질적으로 돈 아끼는 방법에 집중."
         ),
         "value_focus": "돈 아끼기(지원금/절세/할인) + 노력 절감(복잡한 절차 쉽게) + 시간 절약(핵심만 정리)",
@@ -658,7 +647,7 @@ class DynamicKeywordGenerator:
 # ═══════════════════════════════════════════════════════
 
 # ── 한국어 프롬프트 (소비자 중심) ──
-DRAFT_PROMPT_KO = """당신은 이 주제를 직접 경험한 사람이에요. 블로그 방문자가 "이 글 진짜 도움된다"며 즐겨찾기에 저장하는 수준의 글을 써주세요.
+DRAFT_PROMPT_KO = """당신은 자료를 정리하는 편집 보조자입니다. 개인 경험을 지어내지 마세요. 블로그 방문자가 "이 글 진짜 도움된다"며 즐겨찾기에 저장하는 수준의 글을 써주세요.
 
 키워드: {keyword}
 검색의도: {intent}
@@ -722,7 +711,7 @@ DRAFT_PROMPT_KO = """당신은 이 주제를 직접 경험한 사람이에요. �
 - 짧은 문장과 긴 문장을 리듬감 있게 교차 — 셋 중 하나는 질문이나 감탄으로
 
 === E-E-A-T (구글 SEO) ===
-- "직접 해보니", "실제로 써봤는데" 등 1인칭 경험 1~2회
+- 제공된 실사용 기록이 없으면 1인칭 체험담을 쓰지 않는다.
 - 수치/통계에 시점 명시 ("2026년 기준")
 - 공식 기관/사이트명 1개 이상 언급
 
@@ -933,17 +922,12 @@ ADSENSE_DRAFT_PROMPT_KO = """당신은 이 분야의 권위 있는 전문가이�
 === E-E-A-T 필수 신호 (Google 2026 기준 강화) ===
 Google의 Helpful Content & E-E-A-T 평가를 통과하기 위해 모든 글은 다음 신호를 포함해야 합니다:
 
-1. **Experience (경험)**: 도입부 직후 또는 본문 중간에 "실제 경험 문단" 1개 필수
-   - 형식: <div class="experience-box" style="background:#FFF5E8;border-left:4px solid #D4A853;padding:16px 20px;margin:24px 0;border-radius:8px">
-     <p style="margin:0;font-size:15px;line-height:1.8"><strong style="color:#8B6914">직접 경험:</strong> [구체적 상황·시기·수치 포함 개인 경험 2~3문장]</p>
-     </div>
-   - 예: "직접 경험: 2025년 3월 청년내일채움공제를 신청했을 때, 서류 준비에만 꼬박 2주가 걸렸습니다. 가장 헷갈렸던 건 소득 증빙 서류였는데, 국세청 홈택스에서 바로 발급받으면 되는 걸 몰라서 세무서까지 다녀왔어요."
-   - 1인칭 시점, 구체적 날짜/수치, 실패/시행착오 포함 (진정성)
-   - 절대 "많은 사람들이", "일반적으로" 같은 일반화 금지
+1. **Experience (경험)**: 실사용 기록을 제공받은 경우에만 인용한다.
+   - 기록이 없으면 공개 자료를 해석한 글임을 명확히 하고, 체험담을 만들지 않는다.
+   - 설명을 위한 가정은 "가상 예시"로 표시하고 실제 성과와 구분한다.
 
-2. **Expertise (전문성)**: 본문에 최소 2회
-   - "15년간 이 분야를 연구하면서", "수백 건의 사례를 분석한 결과"
-   - 단, 과장 금지 — 실제 근거 있는 수준만
+2. **Expertise (전문성)**: 판단 기준, 비교 과정, 한계와 재현 절차를 설명한다.
+   - 경력, 자격, 연구 건수, 개인 실적을 만들어내지 않는다.
 
 3. **Authoritativeness (권위)**: 데이터 출처 인용 최소 3곳
    - 정부 공식 사이트 (정부24, 국세청, 한국은행, KOSIS, DART)
@@ -1080,7 +1064,7 @@ GOLDEN_INTRO_HOOKS = [
 ]
 
 GOLDEN_DRAFT_PROMPT_KO = """# Role (역할)
-당신은 상위 1%의 정보력과 냉철한 분석력을 갖춘 15년 차 산업/금융/비즈니스 전문가입니다.
+당신은 공개 자료를 비교하고 불확실성을 구분하는 편집 보조자입니다. 경력이나 자격을 만들어내지 마세요.
 당신의 목표는 레드오션에 널린 뻔한 정보가 아닌, 독자가 당장 실행할 수 있는 '시스템적 해결책'과 '압도적인 인사이트'를 제공하는 블로그 포스팅을 작성하는 것입니다.
 
 # Core Topic
@@ -1108,7 +1092,7 @@ GOLDEN_DRAFT_PROMPT_KO = """# Role (역할)
 8. **할루시네이션 절대 금지 (CRITICAL)**:
    - 존재하지 않는 통계, 연구 결과, 기관명, 보고서를 절대 날조하지 말 것.
    - "~에 따르면", "~연구 결과" 등 인용 시 반드시 실존하는 출처만 사용할 것.
-   - 정확한 출처를 모르면 "일반적으로 알려진 바에 따르면", "업계 전문가들의 분석에 의하면" 형태로 작성.
+   - 정확한 출처를 모르면 해당 주장을 삭제하거나 확인이 필요함을 명시. 모호한 권위 표현으로 대체하지 말 것.
    - 구체적 수치 인용은 API 페이로드로 주입된 데이터 또는 널리 알려진 공개 통계만 허용.
    - 가짜 퍼센트(%), 가짜 금액, 가짜 기관명을 지어내는 것은 사이트 신뢰도를 파괴하는 행위임.
 9. **수치 사용 규칙**:
@@ -1183,7 +1167,7 @@ GOLDEN_POLISH_PROMPT_KO = """아래 블로그 초안을 '업계 탑 전문가의
 12. 분량 5,000~7,000자 유지. 군더더기 삭제, 부족하면 데이터 기반 콘텐츠 보강.
 13. **할루시네이션 검증 (CRITICAL — 반드시 수행)**:
     - 본문에서 "~에 따르면", "~연구", "~보고서", "~조사" 등 인용 표현을 모두 찾아라.
-    - 해당 출처가 실존하는지 확인 불가하면 → "일반적으로 알려진 바에 따르면"으로 교체하거나 문장 삭제.
+    - 해당 출처가 실존하는지 확인 불가하면 → 문장 삭제 또는 확인 필요 표시. 검증된 것처럼 표현하지 말 것.
     - 구체적 수치(%, 금액, 건수)가 검증 불가하면 → 범위형 표현("수십%", "상당수")으로 교체.
     - 존재하지 않는 기관명, 학술지명, 법률명이 있으면 즉시 삭제.
     - Google Helpful Content 기준: 가짜 통계 1개 = 사이트 전체 신뢰도 하락.
@@ -1241,7 +1225,14 @@ def get_prompts(lang="ko", adsense_mode=False, category="", golden_mode=False):
         )
         draft_tmpl = draft_tmpl.rstrip() + "\n" + niche_extra
 
-    return draft_tmpl, polish_tmpl
+    truth_rules = """
+=== 사실성 원칙 / Evidence rules (all modes) ===
+Do not invent firsthand use, credentials, statistics, citations or source URLs.
+If supporting evidence was not supplied, omit the claim or mark it as unverified.
+Label hypothetical examples explicitly. Never imply an AI draft was fact-checked.
+개인 경험·성과·경력·출처를 만들지 마세요. 비교 기준과 한계, 확인 절차를 제시하세요.
+"""
+    return draft_tmpl + truth_rules, polish_tmpl + truth_rules
 
 
 class ContentGenerator:
@@ -2281,11 +2272,13 @@ class WordPressPublisher:
         return self._site_name_cache
 
     def publish(self, title, content, category="", tags=None,
-                slug="", focus_keyword="", meta_description=""):
+                slug="", focus_keyword="", meta_description="", status="draft"):
         import requests
+        if status not in ("draft", "publish"):
+            raise ValueError("Unsupported WordPress post status")
         cat_id = self._get_or_create_category(category) if category else None
 
-        post_data = {"title": title, "content": content, "status": "publish", "format": "standard"}
+        post_data = {"title": title, "content": content, "status": status, "format": "standard"}
         if cat_id:
             post_data["categories"] = [cat_id]
         if tags:
@@ -2303,8 +2296,7 @@ class WordPressPublisher:
             seo_meta["rank_math_title"] = f"{title}{seo_title_suffix}"
         if meta_description:
             seo_meta["rank_math_description"] = meta_description
-        # SEO robots: index, follow (명시적 설정)
-        seo_meta["rank_math_robots"] = "a]index,a]follow,a]max-snippet:-1,a]max-image-preview:large,a]max-video-preview:-1"
+        # Use WordPress/theme SEO defaults; do not write a malformed robots value.
         if seo_meta:
             post_data["meta"] = seo_meta
 
@@ -2315,8 +2307,11 @@ class WordPressPublisher:
             )
             resp.raise_for_status()
             data = resp.json()
+            if data.get("status") != status:
+                return {"status": "failed", "error": "WordPress status mismatch; inspect post before retry"}
             return {"id": data["id"], "url": data.get("link", ""),
-                    "title": data.get("title", {}).get("rendered", title), "status": "published"}
+                    "title": data.get("title", {}).get("rendered", title),
+                    "status": "published" if status == "publish" else "draft"}
         except Exception as e:
             log.error(f"발행 실패: {e}")
             return {"status": "failed", "error": str(e)}
@@ -2395,178 +2390,28 @@ class WordPressPublisher:
 # 8. 필수 페이지 자동 생성 (AdSense 승인용, 중복 방지)
 # ═══════════════════════════════════════════════════════
 class EssentialPagesCreator:
-    """About/개인정보처리방침/연락처/면책고지/이용약관 자동 생성.
-    이미 존재하는 페이지는 건너뜀 (slug 기반 중복 체크)."""
+    """Create missing information pages as drafts; preserve existing pages."""
 
-    PAGES = [
-        {
-            "slug": "about",
-            "title": "소개",
-            "content": """<h2>블로그 소개</h2>
-<p>안녕하세요! <strong>{site_name}</strong>에 오신 것을 환영합니다.</p>
-<p>저희 블로그는 독자 여러분께 유용하고 정확한 정보를 제공하기 위해 운영되고 있습니다.
-전문 필진이 직접 조사하고 검증한 내용만을 다루며, 여러분의 일상에 실질적인 도움이 되는
-양질의 콘텐츠를 만들기 위해 노력하고 있습니다.</p>
-<h2>운영 목적</h2>
-<p>복잡한 정보를 쉽고 명확하게 전달하여, 누구나 올바른 의사결정을 할 수 있도록 돕는 것이
-저희의 목표입니다. 재테크, 금융, IT, 생활 정보 등 실용적인 분야를 중심으로 콘텐츠를
-발행하고 있습니다.</p>
-<h2>연락처</h2>
-<p>문의사항이 있으시면 <a href="/contact">문의 페이지</a>를 통해 연락해 주세요.</p>"""
-        },
-        {
-            "slug": "privacy-policy",
-            "title": "개인정보처리방침",
-            "content": """<h2>개인정보처리방침</h2>
-<p><strong>{site_name}</strong>(이하 '사이트')은 이용자의 개인정보를 중요하게 생각하며,
-「개인정보 보호법」을 준수하고 있습니다.</p>
-<h3>1. 수집하는 개인정보 항목</h3>
-<p>사이트는 서비스 제공을 위해 필요한 최소한의 개인정보를 수집합니다.</p>
-<ul>
-<li>댓글 작성 시: 이름, 이메일 주소</li>
-<li>자동 수집: 접속 IP, 쿠키, 방문 일시, 서비스 이용 기록</li>
-</ul>
-<h3>2. 개인정보의 이용 목적</h3>
-<ul>
-<li>서비스 제공 및 운영</li>
-<li>이용자 문의 응대</li>
-<li>사이트 이용 통계 분석</li>
-</ul>
-<h3>3. 개인정보의 보유 및 이용 기간</h3>
-<p>이용자의 개인정보는 수집 목적이 달성된 후 즉시 파기합니다.
-단, 관련 법령에 의해 보존이 필요한 경우 해당 기간 동안 보관합니다.</p>
-<h3>4. 쿠키(Cookie) 사용</h3>
-<p>사이트는 이용자에게 맞춤형 서비스를 제공하기 위해 쿠키를 사용합니다.
-이용자는 브라우저 설정에서 쿠키 허용을 관리할 수 있습니다.</p>
-<h3>5. 광고</h3>
-<p>사이트는 Google AdSense를 포함한 제3자 광고 서비스를 이용할 수 있습니다.
-이러한 광고 서비스 제공업체는 사용자의 관심사에 맞는 광고를 게재하기 위해
-쿠키를 사용할 수 있습니다.</p>
-<h3>6. 개인정보 보호 책임자</h3>
-<p>개인정보 관련 문의는 <a href="/contact">문의 페이지</a>를 통해 연락해 주세요.</p>
-<p><em>시행일: {date}</em></p>"""
-        },
-        {
-            "slug": "contact",
-            "title": "문의하기",
-            "content": """<h2>문의하기</h2>
-<p>블로그에 대한 문의, 제안, 협업 요청 등 무엇이든 환영합니다.</p>
-<h3>문의 방법</h3>
-<p>아래 이메일로 연락해 주시면 빠른 시일 내에 답변 드리겠습니다.</p>
-<p><strong>이메일:</strong> {email}</p>
-<h3>문의 시 참고사항</h3>
-<ul>
-<li>광고 및 협업 관련 문의는 구체적인 내용을 함께 보내주세요.</li>
-<li>콘텐츠 수정 요청은 해당 글의 URL을 포함해 주세요.</li>
-<li>답변은 영업일 기준 1~3일 이내에 드립니다.</li>
-</ul>"""
-        },
-        {
-            "slug": "disclaimer",
-            "title": "면책 고지",
-            "content": """<h2>면책 고지 (Disclaimer)</h2>
-<h3>정보의 정확성</h3>
-<p><strong>{site_name}</strong>에서 제공하는 정보는 참고 목적으로 제공되며,
-정확성이나 완전성을 보장하지 않습니다. 중요한 의사결정 시에는 반드시
-전문가의 조언을 구하시기 바랍니다.</p>
-<h3>제휴 링크 고지</h3>
-<p>이 사이트의 일부 링크는 제휴(어필리에이트) 링크입니다.
-이러한 링크를 통해 제품을 구매하시면 사이트 운영에 도움이 되는
-소정의 수수료를 받을 수 있습니다. 이는 이용자에게 추가 비용을 발생시키지 않습니다.</p>
-<p>이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>
-<h3>외부 링크</h3>
-<p>사이트에 포함된 외부 링크의 내용에 대해서는 책임을 지지 않습니다.</p>
-<h3>투자 관련 면책</h3>
-<p>본 사이트에서 제공하는 금융 관련 정보는 투자 권유가 아니며,
-투자에 따른 손실에 대해 책임을 지지 않습니다.</p>
-<p><em>시행일: {date}</em></p>"""
-        },
-        {
-            "slug": "terms",
-            "title": "이용약관",
-            "content": """<h2>이용약관</h2>
-<h3>제1조 (목적)</h3>
-<p>이 약관은 <strong>{site_name}</strong>(이하 '사이트')이 제공하는 서비스의
-이용 조건 및 절차에 관한 사항을 규정함을 목적으로 합니다.</p>
-<h3>제2조 (이용자의 의무)</h3>
-<ul>
-<li>이용자는 사이트 이용 시 관련 법령을 준수해야 합니다.</li>
-<li>타인의 개인정보를 도용하거나 허위 정보를 기재해서는 안 됩니다.</li>
-<li>사이트의 콘텐츠를 무단으로 복제, 배포, 수정해서는 안 됩니다.</li>
-</ul>
-<h3>제3조 (저작권)</h3>
-<p>사이트에 게시된 모든 콘텐츠의 저작권은 사이트 운영자에게 있습니다.
-무단 전재 및 재배포를 금지합니다.</p>
-<h3>제4조 (면책)</h3>
-<p>사이트는 이용자가 사이트의 정보를 이용하여 발생한 손해에 대해
-책임을 지지 않습니다.</p>
-<h3>제5조 (약관의 변경)</h3>
-<p>사이트는 필요 시 약관을 변경할 수 있으며, 변경된 약관은
-사이트에 공지한 시점부터 효력이 발생합니다.</p>
-<p><em>시행일: {date}</em></p>"""
-        },
-    ]
-
-    def __init__(self):
-        import base64
-        self.url = WP_URL.rstrip("/")
-        cred = base64.b64encode(f"{WP_USER}:{WP_PASS}".encode()).decode()
-        self.headers = {
-            "Authorization": f"Basic {cred}",
-            "Content-Type": "application/json"
-        }
-
-    def create_all(self, site_name="", email="contact@example.com"):
+    def create_all(self, site_name="", email=""):
         import requests
-        date_str = datetime.now(KST).strftime("%Y년 %m월 %d일")
-        if not site_name:
-            site_name = WP_URL.replace("https://", "").replace("http://", "").split("/")[0]
-
-        created = []
-        skipped = []
-        failed = []
-
-        for page in self.PAGES:
-            slug = page["slug"]
-
-            # ── 중복 체크: slug로 기존 페이지 검색 ──
-            try:
-                resp = requests.get(
-                    f"{self.url}/wp-json/wp/v2/pages",
-                    headers=self.headers,
-                    params={"slug": slug, "per_page": 1, "status": "any"},
-                    timeout=10
-                )
-                existing = resp.json()
-                if isinstance(existing, list) and len(existing) > 0:
-                    log.info(f"  '{page['title']}' ({slug}) 이미 존재 — 건너뜀")
-                    skipped.append(page["title"])
-                    continue
-            except Exception as e:
-                log.warning(f"  '{page['title']}' 중복 확인 실패, 생성 시도: {e}")
-
-            # ── 페이지 생성 ──
-            content = page["content"].format(
-                site_name=site_name, date=date_str, email=email
-            )
-
-            try:
-                resp = requests.post(
-                    f"{self.url}/wp-json/wp/v2/pages",
-                    headers=self.headers,
-                    json={"title": page["title"], "slug": slug, "content": content, "status": "publish"},
-                    timeout=15
-                )
-                resp.raise_for_status()
-                url = resp.json().get("link", "")
-                log.info(f"  '{page['title']}' 페이지 생성 완료: {url}")
-                created.append(page["title"])
-            except Exception as e:
-                log.error(f"  '{page['title']}' 페이지 생성 실패: {e}")
-                failed.append(page["title"])
-
-        log.info(f"\n  필수 페이지 결과: 생성 {len(created)}개 / 이미 존재 {len(skipped)}개 / 실패 {len(failed)}개")
-        return created, skipped, failed
+        import base64
+        try:
+            from .editorial_pages import build_pages, create_missing_drafts
+        except ImportError:
+            from editorial_pages import build_pages, create_missing_drafts
+        from urllib.parse import urlparse
+        url = WP_URL.rstrip("/")
+        if urlparse(url).scheme != "https" or urlparse(url).username or urlparse(url).password:
+            raise ValueError("WP_URL은 자격증명 없는 HTTPS 주소여야 합니다.")
+        pages = build_pages(site_name or urlparse(url).hostname,
+                            os.environ.get("BLOG_OWNER", ""),
+                            os.environ.get("BLOG_DESC", ""),
+                            email or os.environ.get("CONTACT_EMAIL", ""))
+        cred = base64.b64encode(f"{WP_USER}:{WP_PASS}".encode()).decode()
+        headers = {"Authorization": f"Basic {cred}", "Content-Type": "application/json"}
+        result = create_missing_drafts(url, headers, pages, requests)
+        log.info("사이트 정보: 초안 %d / 기존 유지 %d / 실패 %d", *(len(x) for x in result))
+        return result
 
 
 # ═══════════════════════════════════════════════════════
@@ -2602,7 +2447,7 @@ class SupabaseLogger:
                 "sns_shared": json.dumps(data.get("sns_shared", [])),
                 "status": data.get("status", "published"),
                 "error_message": data.get("error_message", ""),
-                "published_at": datetime.now(KST).isoformat(),
+                "published_at": datetime.now(KST).isoformat() if data.get("status", "published") == "published" else None,
             }
             requests.post(
                 f"{self.url}/rest/v1/publish_logs", headers=self.headers,
@@ -3649,7 +3494,7 @@ SITE_AUTHORS = {
         "name": "Bomissu 운영자",
         "url": "https://bomissu.com/about-us/",
         "avatar": "https://bomissu.com/wp-content/uploads/2026/04/bomissu-avatar.png",
-        "bio": "재테크·부업·정부지원금 15년 연구 · 정보성 분석 전문",
+        "bio": "생활경제 정보 정리",
         "publisher": "Bomissu",
     },
     "planx-ai.com": {
@@ -3750,7 +3595,7 @@ def _inject_eeat_blocks(content, title, site_config=None, slug="", pub_date=""):
             "<div>"
             f"<div style=\"font-family:Georgia,serif;font-size:17px;font-weight:700;color:#1A1612\">{author['name']}</div>"
             f"<div style=\"font-size:13px;color:#6B5E52;margin-top:4px\">{author['bio']}</div>"
-            "<div style=\"font-size:12px;color:#9E8E7E;margin-top:6px\">모든 수치는 공식 출처를 기반으로 재검증합니다.</div>"
+            "<div style=\"font-size:12px;color:#9E8E7E;margin-top:6px\">정보의 기준일과 원문을 확인해 주세요. 오류 제보는 문의 페이지에서 받습니다.</div>"
             "</div></div>\n"
         )
         content = content.rstrip() + author_box
@@ -3987,6 +3832,11 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
     if adsense_mode:  # CLI --adsense-mode override
         effective_adsense = True
 
+    # Approval preparation is an editorial queue, independent of dashboard stage.
+    # Invalid/unset settings fail closed. Human review happens in WordPress.
+    editorial_review = os.environ.get("EDITORIAL_REVIEW_REQUIRED", "true").lower() != "false"
+    draft_only = effective_adsense or editorial_review
+
     # 골든타임 모드: Golden 전용 프롬프트 (Gemini 3대 전략) + Claude 폴리싱 + 품질 90+
     if golden_mode:
         # Golden 프롬프트 사용 (adsense_mode와 독립 — get_prompts에서 golden_mode 우선)
@@ -4080,6 +3930,7 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         log.info(f"  [{kw.get('type', 'traffic')}] {kw['keyword']}")
 
     success = 0
+    drafted = 0
     fail = 0
 
     for i, kw_data in enumerate(keywords, 1):
@@ -4113,6 +3964,8 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
                     f"기존 '{top_conflict[0]}'과 유사도 {top_conflict[1]}. 카니발라이제이션 위험.",
                     "warning", "cannibal_high"
                 )
+                # Do not spend another generation call on near-duplicate material.
+                continue
 
         # Step 1: AI 글 생성
         content, cost_usd, content_length = cg.generate(
@@ -4198,7 +4051,7 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
                     quality_score = max(quality_score, qs2)
 
         if not passed:
-            log.warning(f"품질 미달 ({quality_score}/{min_score}) — 발행 진행")
+            log.warning(f"품질 미달 ({quality_score}/{min_score}) — 초안으로만 저장")
             sb.log_alert(
                 f"품질 미달: {keyword}",
                 f"점수 {quality_score}/{min_score}. 항목: {json.dumps(q_details, ensure_ascii=False)[:300]}",
@@ -4244,10 +4097,12 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         except Exception as _e:
             log.warning(f"E-E-A-T 블록 주입 실패 (무시하고 계속): {_e}")
 
+        # A numeric score or regex warning is not evidence of factual accuracy.
+        post_status = "draft" if draft_only or not passed or cred_warnings else "publish"
+
         # Step 7: 발행
         if dry_run:
             log.info(f"[DRY RUN] 발행 스킵: {title} (품질: {quality_score}/100)")
-            km.mark_used(keyword)
             success += 1
             continue
 
@@ -4267,9 +4122,19 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         result = wp.publish(title, content, category=category,
                            tags=[keyword, category] if category else [keyword],
                            slug=seo_slug, focus_keyword=seo_focus,
-                           meta_description=seo_meta_desc)
+                           meta_description=seo_meta_desc, status=post_status)
 
-        if result["status"] == "published":
+        if result["status"] == "draft":
+            drafted += 1
+            log.info(f"편집 검토용 초안 저장: post_id={result.get('id')} (품질: {quality_score}/100)")
+            km.mark_used(keyword)
+            sb.log_publish({
+                "title": title, "keyword": keyword, "pipeline": pipeline,
+                "quality_score": quality_score, "status": "draft",
+                "url": result.get("url", ""), "sns_shared": [],
+            })
+            # Draft URLs must never be sent to SNS or indexing services.
+        elif result["status"] == "published":
             log.info(f"발행 성공: {result.get('url', '')} (품질: {quality_score}/100)")
             km.mark_used(keyword)
             success += 1
@@ -4330,14 +4195,15 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         time.sleep(delay)
 
     log.info(f"\n{'='*60}")
-    log.info(f"실행 결과: 성공 {success}편 / 실패 {fail}편 / 총 {len(keywords)}편")
+    log.info(f"실행 결과: 공개 {success}편 / 초안 {drafted}편 / 실패 {fail}편 / 총 {len(keywords)}편")
     log.info(f"{'='*60}")
 
     # SEO: 발행 완료 후 사이트맵 핑 (Google, Bing, IndexNow)
     if success > 0 and not dry_run:
         _ping_sitemaps(WP_URL)
 
-    _git_commit_used()
+    if not dry_run:
+        _git_commit_used()
 
 
 def _insert_internal_links(content, wp_publisher, current_keyword):
@@ -4511,7 +4377,7 @@ def main():
     parser.add_argument("--setup-pages", action="store_true", help="AdSense 필수 페이지 자동 생성")
     parser.add_argument("--check-status", action="store_true", help="API 연결 상태 체크 → Supabase 기록")
     parser.add_argument("--site-name", default="", help="사이트 이름 (필수 페이지용)")
-    parser.add_argument("--email", default="contact@example.com", help="연락처 이메일")
+    parser.add_argument("--email", default="", help="연락처 이메일")
     parser.add_argument("--niche", default="", help="니치/카테고리 필터 (재테크, 투자, 대출 등)")
     parser.add_argument("--polish", action="store_true", help="Claude AI 폴리싱 활성화 (비용 증가)")
     parser.add_argument("--golden", action="store_true", help="골든타임 모드: 고품질 프롬프트 + Claude 폴리싱 + 품질 90+ 기준")
@@ -4532,8 +4398,8 @@ def main():
             log.error("WP_URL, WP_USERNAME, WP_APP_PASSWORD 환경변수 필요")
             sys.exit(1)
         epc = EssentialPagesCreator()
-        epc.create_all(site_name=args.site_name, email=args.email)
-        sys.exit(0)
+        _, _, failed = epc.create_all(site_name=args.site_name, email=args.email)
+        sys.exit(1 if failed else 0)
 
     # AI API 키 체크: --site-id 모드는 Supabase에서 로드 가능하므로 나중에 체크
     if not args.site_id and not args.mode and not (DEEPSEEK_KEY or GROK_KEY or GEMINI_KEY):
