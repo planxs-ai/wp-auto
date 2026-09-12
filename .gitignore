@@ -11,3 +11,11 @@ node_modules/
 
 # Screenshots
 *.png
+
+# deals — 시크릿·키 파일은 절대 커밋하지 않는다 (Blogger-Engine 재발 방지, 밑그림 §9)
+config_keys.json
+credentials.json
+token*.json
+*.pem
+*.key
+deals/.env
