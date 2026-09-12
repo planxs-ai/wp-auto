@@ -4097,6 +4097,13 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         except Exception as _e:
             log.warning(f"E-E-A-T 블록 주입 실패 (무시하고 계속): {_e}")
 
+        # Keep one useful TOC and avoid repeated copies of the same stock image.
+        try:
+            from .site_remediation import clean_html
+        except ImportError:
+            from site_remediation import clean_html
+        content, _ = clean_html(content)
+
         # A numeric score or regex warning is not evidence of factual accuracy.
         post_status = "draft" if draft_only or not passed or cred_warnings else "publish"
 

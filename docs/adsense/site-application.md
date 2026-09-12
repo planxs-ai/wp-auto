@@ -1,0 +1,72 @@
+# planx-ai.com 반려 대응 — 적용 준비와 남은 작업
+
+## 실제 공개 데이터 조사
+
+2026-09-12 WordPress 공개 REST API에서 공개 글 **700편**, 페이지 **6개**, 카테고리 **58개**를 읽었습니다. 7개 글 목록 페이지를 모두 가져왔습니다. 초안/비공개 글 및 관리자 설정은 포함하지 않습니다.
+
+- **315편**: 연결형 목차 외에 생성된 일반 목록형 목차가 반복됨. 적용 계획에서 자동 정리.
+- **동일 이미지 주소 중복 0편**: 일괄 이미지 삭제 없음. 중복 이미지 제거 로직은 향후 발생 시에만 작동.
+- **165편**: 개인 경험/실사용/경력 표현이 있어 실제 기록 대조 필요.
+- **336편**: 보장·성과·실패율 관련 표현 검토 필요.
+- **538편**: 내부 링크와 이미지 출처·제휴 링크를 제외한 외부 링크를 찾지 못함. 외부 링크가 없다는 사실 자체를 정책 위반으로 판정하지 않음.
+- 주소의 마지막 숫자를 제외해 묶은 **103개 주제 묶음**: 의미상 중복 확정이 아님. 예를 들어 65편의 날짜별 전략리포트는 내용을 대조해야 하므로 자동 통합/삭제하지 않음.
+- 소개/문의/개인정보 페이지에 `contact@example.com`이 실제 공개되어 있음. 기존 저장소의 운영 스크립트에 사용된 `planxsol@gmail.com`으로 교체할 수정본 준비.
+- ID 1208: WordPress ‘제안된 텍스트’가 남은 별도 개인정보 페이지. 읽기 플러그인은 이 주소를 기존 `/privacy-policy/`로 301 연결하며 원본 레코드를 삭제하지 않음.
+
+수치는 정규식·구조 탐지 결과로 서로 겹칩니다. Google이 확정한 개별 위반 건수나 사람에 의한 전수 사실검증 건수가 아닙니다.
+
+## 준비한 수정본
+
+1. `scripts/site_remediation.py`: 각 글의 수정 시각과 주소를 확인하고, 수정 전 원문을 권한 0600의 로컬 파일로 보관한 뒤 적용/재조회 검증. 실패하면 전체 진행 중단. 기존 글의 공개 상태와 주소는 유지.
+2. `docs/adsense/remediation-plan.json`: 공개 글 700편의 개별 후보와 페이지 3개의 적용 대상. 적용 전 변경된 글은 충돌로 표시하고 쓰기를 생략.
+3. `content/adsense/`: 최신 이어폰(1429), 모니터(1426), 월배당(1428) 글의 제목/요약/본문 재작성. 개인 체험, 제품 수명, 실운용 성과 등을 지어내지 않음. 월배당 숫자는 실제 실적이 아닌 가상 계산 예시로 명시.
+4. 소개·문의 페이지 재작성 및 현재 개인정보 페이지에 Google 광고 쿠키/맞춤 광고 해제 안내 추가. 개인정보 페이지의 기존 본문은 보존하므로 실제 사용 중인 Analytics·댓글·쿠키·보유기간 등의 운영정보 확인은 별도로 필요.
+5. `wordpress/planx-reading-experience/`: 홈/목록을 본문 전체 대신 180자 요약과 읽기 링크로 표시. 웜톤·모바일 표 스크롤·키보드 포커스·공개 정보 페이지 링크. 콘텐츠 수정 없이 비활성화로 화면을 되돌릴 수 있음.
+6. 신규 생성 글에도 같은 목차/이미지 중복 정리를 적용. 기존 PR #3의 초안 저장 통제 유지.
+
+## 적용 방법
+
+가능하면 연결된 WordPress 관리 연동으로 먼저 백업·관리자 설정을 확인한 뒤 적용합니다. 현재 작업 환경에는 WordPress 쓰기 자격증명이 없습니다. 제안한 WPVibe가 설치/사이트 연결되었다는 확인도 아직 없습니다. 저장소에 올리는 것은 사이트 적용과 다릅니다.
+
+환경변수 `WP_URL=https://planx-ai.com`, `WP_USERNAME`, `WP_APP_PASSWORD`를 안전하게 설정한 실행 환경에서는 다음으로 적용할 수 있습니다. 키를 명령 인수·작업 로그에 붙이지 않습니다.
+
+```bash
+pip install -r requirements.txt
+python -m unittest discover -s tests -v
+python scripts/site_remediation.py --apply docs/adsense/remediation-plan.json --backup-dir .private-backups/adsense --output apply-results.json
+```
+
+계획 작성 이후 원문이 변경된 항목은 새 공개 목록으로 계획을 갱신하고 다시 검토해야 합니다. 백업이 이미 있는 글은 재시도하지 않습니다. 중간 실패/타임아웃이면 해당 글을 조회해 실제 상태를 확인한 후 계속해야 합니다. 백업은 저장소에서 제외되며 실행 환경의 안전한 영구 저장소에 별도로 보관해야 합니다.
+
+```bash
+python scripts/site_remediation.py --restore .private-backups/adsense/posts-1429.json
+```
+
+복구 시에도 이후 사람이 고친 글은 덮어쓰지 않습니다. 전체 배치가 데이터베이스 트랜잭션으로 묶인 것은 아니므로 부분 적용은 결과 목록과 백업으로 확인합니다. 백업에는 제목/본문/요약/공개 상태가 있고, 자격증명이나 사용자 목록은 포함하지 않습니다.
+
+홈/목록 변경은 `wordpress/planx-reading-experience` 디렉터리를 WordPress 플러그인으로 설치하고 활성화해야 합니다. GitHub 병합만으로 WordPress 서버에 파일이 설치되지는 않습니다.
+
+## 검증 범위
+
+- 회귀 테스트 **16개**: 초안 공개 방지, 원문 보존, 중복 정리의 반복 실행 안전성, 수정 충돌 차단, 백업 선행, 재조회 검증, 복구, 대상 사이트 제한 등.
+- Python 컴파일, PHP 및 JSX 파서 문법 검사, git diff 공백 검사.
+- 실제 공개 REST 데이터 전체 읽기 성공.
+- **미검증**: WordPress 인증 쓰기, 플러그인의 실제 GeneratePress 화면, 휴대폰 실제 화면, 검색 로봇/WAF 설정, AdSense 계정 소유권 상태, 승인 결과.
+
+## 재심사 전에 반드시 남아 있는 일
+
+- 원본 기록을 바탕으로 체험/성과 후보 글 검토. 전수 정규식 검사는 사실 확인을 대신하지 않음.
+- 실제 활성 서비스와 보유기간에 맞게 개인정보처리방침 확정. 현재 개인정보 보완은 필요한 광고 안내 추가이며 전체 법적 적합성을 확인한 결과가 아님.
+- 재작성한 3편 외 나머지 글의 근거·최신성·독창성 검토. 반복 주제 묶음은 날짜별 업데이트와 실질 중복을 구분.
+- 적용 후 비로그인·모바일·메뉴·정책 링크·사이트맵/robots·AdSense 소유권 연결 확인.
+
+**이번 준비만으로 ‘700편 전체 수정/검증 완료’ 또는 ‘승인 가능 확정’이라고 표시하지 않습니다.**
+
+## 공식 기준과 내용 근거
+
+- [Google 콘텐츠·사용자 환경](https://support.google.com/adsense/answer/10015918?hl=ko)
+- [Google 개인정보처리방침 필수 광고 안내](https://support.google.com/adsense/answer/1348695?hl=ko)
+- [WordPress 글 REST API](https://developer.wordpress.org/rest-api/reference/posts/)
+- [Apple 이어팁 안내](https://support.apple.com/en-us/119849)
+- [Microsoft Windows 지원](https://support.microsoft.com/en-us/windows/)
+- [FINRA ETF 및 상장지수상품 안내](https://www.finra.org/investors/investing/investment-products/exchange-traded-funds-and-products)

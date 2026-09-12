@@ -44,9 +44,9 @@ def audit(url, max_pages=1):
     base = url.rstrip("/")
     result = {"site": base, "scope": "public GET only; flags require human review",
               "errors": [], "posts": [], "pages": [], "sample_complete": False}
-    # Session deliberately ignores .netrc/environment credentials and proxy auth.
+    # No website credentials: disable implicit .netrc authentication.
     with requests.Session() as session:
-        session.trust_env = False
+        session.auth = lambda request: request  # Suppress .netrc auth; retain required proxy routing.
         def get(path, params=None):
             response = session.get(base + path, params=params, timeout=15)
             response.raise_for_status()

@@ -40,3 +40,5 @@ python scripts/main.py --count 1 --dry-run
 - 페이지 생성: `python scripts/setup_pages.py` (기존 페이지 보존, 누락된 정보 페이지 초안만 생성)
 - 페이지 초안에 필요한 환경변수: `WP_URL`, `WP_USERNAME`, `WP_APP_PASSWORD`, `BLOG_OWNER`, `BLOG_DESC`, `CONTACT_EMAIL`. 대시보드 운영정보 연동은 `SITE_ID`, `SUPABASE_URL`, `SUPABASE_KEY`를 사용합니다.
 - `--dry-run`은 공개를 생략하지만 AI 생성 등 읽기/API 호출 비용은 발생할 수 있습니다.
+
+실제 사이트 반려 대응: [700편 공개 목록 조사·수정 적용 절차](docs/adsense/site-application.md). WordPress 수정본·홈/목록 플러그인·원문 백업/복구 도구를 포함합니다. GitHub 병합과 실제 WordPress 적용은 별도입니다.
