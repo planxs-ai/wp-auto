@@ -1,182 +1,75 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { getGitHubCredentials } from '@/lib/github-helper';
+import { requireAdmin, requireLivePublish, dispatchWorkflow, githubFailure, errorResponse, AdminApiError } from '@/lib/admin-api';
 
-// Each workflow and its allowed input keys (GitHub 422s on unknown inputs)
+// ═══════════════════════════════════════════
+// 관리자 전용 GitHub Actions 트리거
+// - WP 자격증명은 요청·DB 에서 읽지 않는다. 각 워크플로가 GitHub secrets 에서 사이트별로 읽는다
+// - 워크플로가 선언한 input 만 보낸다 (선언 밖 키를 보내면 GitHub 가 422)
+// ═══════════════════════════════════════════
+
+// 운영 사이트. 워크플로의 site_id choice 옵션과 같아야 한다 (planx-ai.com, bomissu.com)
+const SITE_IDS = ['site-1', 'site-1775046458524'];
+const DEFAULT_REPO = 'planxs-ai/wp-auto';
+
+// patterns: run 스크립트에 그대로 들어가는 문자열 input 은 형식을 제한한다
 const WORKFLOW_CONFIG = {
-  'setup-menu': {
-    file: 'setup-menu.yml',
-    inputs: ['wp_url', 'wp_username', 'wp_app_password', 'site_id'],
-  },
-  'setup-pages': {
-    file: 'setup-pages.yml',
-    inputs: ['wp_url', 'wp_username', 'wp_app_password', 'site_id', 'blog_owner', 'blog_desc', 'contact_email'],
-  },
-  'inject-css': {
-    file: 'inject-css.yml',
-    inputs: ['wp_url', 'wp_username', 'wp_app_password', 'wp_login_password', 'site_id'],
-  },
-  'inject-css-posts': {
-    file: 'inject-css-posts.yml',
-    inputs: ['wp_url', 'wp_username', 'wp_app_password', 'dry_run', 'force_update'],
-  },
+  'setup-menu': { file: 'setup-menu.yml', inputs: ['site_id'] },
+  'setup-pages': { file: 'setup-pages.yml', inputs: ['site_id', 'blog_owner', 'blog_desc', 'contact_email'] },
+  'inject-css': { file: 'inject-css.yml', inputs: ['site_id'] },
+  'inject-css-posts': { file: 'inject-css-posts.yml', inputs: ['site_id', 'dry_run', 'force_update'] },
+  // publish.yml 은 사이트 input 이 없다. 실행하면 planx·bomissu job 이 함께 돈다.
+  // 그래서 편수는 사이트당 3편까지(두 사이트 합계 최대 6편)로 묶고, 실제 발행은 스위치로 잠근다.
+  // publish.yml 에 site_id input 이 생기면 inputs 에 'site_id' 를 넣어 선택한 사이트만 보낸다
   'publish': {
     file: 'publish.yml',
-    inputs: ['site_id', 'count', 'dry_run', 'pipeline', 'niche'],
+    inputs: ['count', 'dry_run', 'pipeline', 'niche'],
+    patterns: { count: /^[1-3]$/, dry_run: /^(true|false)$/, pipeline: /^(autoblog|hotdeal|promo)$/, niche: /^[a-z0-9-]*$/ },
+    live: (inputs) => inputs.dry_run !== 'true',
+    liveNote: 'publish.yml 은 planx·bomissu 두 사이트 job 을 함께 실행합니다',
   },
 };
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
-}
-
-async function verifyAuth(request) {
-  const authHeader = request.headers.get('authorization');
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
-
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (!error && user) return user;
-  }
-
-  return null;
-}
-
-async function getSiteCredentials(siteId) {
-  if (!siteId) return null;
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from('sites')
-    .select('wp_url, domain, config')
-    .eq('id', siteId)
-    .single();
-  if (!data) return null;
-  return {
-    wp_url: data.wp_url,
-    domain: data.domain,
-    wp_username: data.config?.wp_username || '',
-    wp_app_password: data.config?.wp_app_password || '',
-    wp_login_password: data.config?.wp_login_password || data.config?.wp_app_password || '',
-  };
-}
-
 export async function POST(request) {
-  const user = await verifyAuth(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  try {
+    await requireAdmin(request);
 
-  const { action, siteId, inputs } = await request.json();
+    const body = (await request.json().catch(() => null)) || {};
+    const { action, siteId } = body;
+    const config = WORKFLOW_CONFIG[action];
+    if (!config) throw new AdminApiError(400, `알 수 없는 작업: ${action}`);
 
-  const config = WORKFLOW_CONFIG[action];
-  if (!config) {
-    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
-  }
-
-  // 사이트별 GitHub 인증정보 조회
-  const gh = await getGitHubCredentials(siteId);
-
-  // 권한 확인: 고객 fork(site 소유자) 또는 admin
-  const supabaseAdmin = getSupabaseAdmin();
-  if (gh?.source === 'site') {
-    // 고객 fork — 사이트 소유자만 허용
-    const { data: userSite } = await supabaseAdmin
-      .from('user_sites')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('site_id', siteId)
-      .single();
-    if (!userSite) {
-      return NextResponse.json({ error: '해당 사이트에 대한 권한이 없습니다.' }, { status: 403 });
+    // 사이트를 받는 작업은 운영 사이트만 허용. publish 도 다른 사이트를 고른 채 누르면 막는다
+    const needsSite = config.inputs.includes('site_id');
+    if ((needsSite || siteId) && !SITE_IDS.includes(siteId)) {
+      throw new AdminApiError(400, `운영 사이트(${SITE_IDS.join(', ')})에서만 실행할 수 있습니다. 받은 값: ${siteId || '(없음)'}`);
     }
-  } else {
-    // env 변수 fallback — admin만 허용
-    const { data: profile } = await supabaseAdmin
-      .from('user_profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    if (profile?.role !== 'admin') {
-      return NextResponse.json({
-        error: '관리자만 워크플로우를 실행할 수 있습니다.',
-        guide: 'GitHub 연동에서 Fork 저장소를 먼저 등록하세요.',
-      }, { status: 403 });
-    }
-  }
 
-  if (!gh) {
+    const values = { ...(body.inputs || {}), site_id: siteId };
+    const inputs = {};
+    for (const key of config.inputs) {
+      const value = values[key];
+      if (value === undefined || value === null || value === '') continue;
+      const text = String(value);
+      const pattern = config.patterns?.[key];
+      if (pattern && !pattern.test(text)) {
+        throw new AdminApiError(400, `${key} 값 형식이 올바르지 않습니다: ${text}`);
+      }
+      inputs[key] = text;
+    }
+
+    // dry_run 을 빼고 보내면 워크플로 기본값('false')으로 실제 발행된다 → 'true' 가 아니면 실제 발행으로 본다
+    if (config.live && config.live(inputs)) requireLivePublish(config.liveNote);
+
+    const result = await dispatchWorkflow(config.file, inputs, DEFAULT_REPO);
+    if (!result.ok) return githubFailure(result, config.file);
+
     return NextResponse.json({
-      error: 'GitHub 인증정보가 없습니다.',
-      guide: '설정 > GitHub 연동에서 Fork 저장소와 토큰을 먼저 등록하세요.',
-    }, { status: 400 });
-  }
-
-  // Fetch site credentials from Supabase
-  const creds = await getSiteCredentials(siteId);
-  if (!creds || !creds.wp_url) {
-    return NextResponse.json({
-      error: '사이트 인증정보를 찾을 수 없습니다. 설정에서 사이트를 먼저 연결해주세요.',
-      siteId,
-    }, { status: 400 });
-  }
-
-  // Build all possible values, then filter to only allowed inputs
-  const allValues = {
-    ...(inputs || {}),
-    wp_url: creds.wp_url,
-    wp_username: creds.wp_username,
-    wp_app_password: creds.wp_app_password,
-    wp_login_password: creds.wp_login_password,
-    site_id: siteId || '',
-  };
-
-  // Only include keys that the target workflow defines (prevents GitHub 422)
-  const workflowInputs = {};
-  for (const key of config.inputs) {
-    if (allValues[key] !== undefined && allValues[key] !== '') {
-      workflowInputs[key] = String(allValues[key]);
-    }
-  }
-
-  const [owner, repo] = gh.repo.split('/');
-
-  const resp = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${config.file}/dispatches`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${gh.token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ref: 'main', inputs: workflowInputs }),
-    }
-  );
-
-  if (resp.status === 204) {
-    return NextResponse.json({
-      success: true, action,
-      message: `${action} triggered on ${gh.repo} for ${creds.domain}`,
+      success: true,
+      action,
+      repo: result.repo,
+      message: `${config.file} 실행 요청 완료 (${result.repo})`,
     });
+  } catch (err) {
+    return errorResponse(err);
   }
-
-  const errorBody = await resp.text();
-  return NextResponse.json({
-    error: `GitHub API failed: ${resp.status}`,
-    detail: errorBody,
-    guide: resp.status === 404
-      ? 'Fork 저장소를 확인하세요. publish.yml이 존재하는지 확인해주세요.'
-      : resp.status === 403
-      ? 'GitHub Token 권한을 확인하세요 (repo + workflow 스코프 필요).'
-      : null,
-    debug: { repo: gh.repo, workflow: config.file, site: creds.domain },
-  }, { status: resp.status });
 }

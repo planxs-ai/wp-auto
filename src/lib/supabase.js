@@ -22,20 +22,7 @@ export function monthStartKST() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
-// ── Auth Helpers ──
-
-export async function signUp(email, password, displayName) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { display_name: displayName },
-      emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/settings` : undefined,
-    },
-  });
-  if (error) throw error;
-  return data;
-}
+// ── Auth Helpers (관리자 로그인 전용 — 회원가입 없음) ──
 
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });

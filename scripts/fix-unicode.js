@@ -36,7 +36,6 @@ function fixUnicodeEscapes(content) {
 }
 
 const dirs = [
-  'src/app/(consumer)',
   'src/app/(auth)',
   'src/components',
   'src/lib'
