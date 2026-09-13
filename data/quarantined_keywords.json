@@ -1,0 +1,86 @@
+[
+  {
+    "source": "data/keywords_bomissu.json",
+    "keyword": "직장인 부업 추천 2026 현실 수익 공개",
+    "reason": "수익 주장형 키워드 — 수익화 규칙(부업·수익화 글 제휴 없음, 수익 주장 금지), 2026-09-14 사용자 결정으로 삭제",
+    "entry": {
+      "keyword": "직장인 부업 추천 2026 현실 수익 공개",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업·수익화",
+      "pipeline": "autoblog",
+      "slug": "employee-side-job-2026",
+      "focus_keyword": "직장인 부업 추천 2026"
+    }
+  },
+  {
+    "source": "data/keywords_bomissu.json",
+    "keyword": "프리랜서 월 500만원 수입 만드는 로드맵",
+    "reason": "수익 주장형 키워드 — 수익화 규칙(부업·수익화 글 제휴 없음, 수익 주장 금지), 2026-09-14 사용자 결정으로 삭제",
+    "entry": {
+      "keyword": "프리랜서 월 500만원 수입 만드는 로드맵",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업·수익화",
+      "pipeline": "autoblog",
+      "slug": "freelancer-5m-roadmap",
+      "focus_keyword": "프리랜서 수입 로드맵"
+    }
+  },
+  {
+    "source": "data/keywords_bomissu.json",
+    "keyword": "스마트스토어 창업 현실 수익 후기 2026",
+    "reason": "수익 주장형 키워드 — 수익화 규칙(부업·수익화 글 제휴 없음, 수익 주장 금지), 2026-09-14 사용자 결정으로 삭제",
+    "entry": {
+      "keyword": "스마트스토어 창업 현실 수익 후기 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업·수익화",
+      "pipeline": "autoblog",
+      "slug": "smartstore-startup-review-2026",
+      "focus_keyword": "스마트스토어 창업 현실"
+    }
+  },
+  {
+    "source": "data/keywords_bomissu.json",
+    "keyword": "전자책 출판 부업 월 수익 50만원 만들기",
+    "reason": "수익 주장형 키워드 — 수익화 규칙(부업·수익화 글 제휴 없음, 수익 주장 금지), 2026-09-14 사용자 결정으로 삭제",
+    "entry": {
+      "keyword": "전자책 출판 부업 월 수익 50만원 만들기",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업·수익화",
+      "pipeline": "autoblog",
+      "slug": "ebook-publishing-side-income",
+      "focus_keyword": "전자책 출판 부업"
+    }
+  },
+  {
+    "source": "data/keywords.json",
+    "keyword": "유튜브 수익화 조건 2026 시작 가이드",
+    "reason": "수익 주장형 키워드 — 수익화 규칙(부업·수익화 글 제휴 없음, 수익 주장 금지), 2026-09-14 사용자 결정으로 삭제",
+    "entry": {
+      "keyword": "유튜브 수익화 조건 2026 시작 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업 & 수익화",
+      "pipeline": "autoblog",
+      "slug": "youtube-monetization-2026",
+      "focus_keyword": "유튜브 수익화 조건"
+    }
+  },
+  {
+    "source": "data/keywords.json",
+    "keyword": "AI 부업 아이디어 2026 자동 수익",
+    "reason": "수익 주장형 키워드 — 수익화 규칙(부업·수익화 글 제휴 없음, 수익 주장 금지), 2026-09-14 사용자 결정으로 삭제",
+    "entry": {
+      "keyword": "AI 부업 아이디어 2026 자동 수익",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업 & 수익화",
+      "pipeline": "autoblog",
+      "slug": "ai-side-hustle-2026",
+      "focus_keyword": "AI 부업 아이디어"
+    }
+  }
+]

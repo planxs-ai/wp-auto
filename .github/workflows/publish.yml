@@ -1,17 +1,23 @@
 name: AutoBlog Publish
 
+# ═══════════════════════════════════════════════════════════════
+# 예약 발행 없음 (2026-09-13 결정: AdSense 재심사 준비 중에는 사람이 검토한 글만 공개)
+# - 모든 글은 WordPress 초안으로만 저장됩니다(EDITORIAL_REVIEW_REQUIRED). 편집자가 확인한 뒤 WordPress에서 직접 공개합니다.
+# - 지인 사이트(fork) 발행 job은 삭제했습니다. main.py는 site-1·site-1775046458524 외의 사이트면 exit 1로 끝납니다.
+# - 예약 재개는 AdSense 승인 뒤 사용자 결정으로만: on.schedule과 각 job의 if 조건을 함께 복원하세요.
+# ═══════════════════════════════════════════════════════════════
 on:
-  schedule:
-    # Fork 기본 스케줄: KST 08:00, 14:00, 20:00
-    - cron: '0 23 * * *'    # KST 08:00
-    - cron: '0 5 * * *'     # KST 14:00
-    - cron: '0 11 * * *'    # KST 20:00
-    # planx-ai 추가 스케줄
-    - cron: '30 23 * * *'   # KST 08:30 (bomissu)
-    - cron: '30 3 * * *'    # KST 12:30 (bomissu)
-    - cron: '30 10 * * *'   # KST 19:30 (bomissu)
   workflow_dispatch:
     inputs:
+      site_id:
+        description: '대상 사이트 (all=두 사이트 모두)'
+        type: choice
+        required: false
+        default: 'all'
+        options:
+          - all
+          - site-1
+          - site-1775046458524
       count:
         description: '발행 편수'
         required: false
@@ -31,91 +37,29 @@ on:
         default: 'autoblog'
         options:
           - autoblog
-          - hotdeal
-          - promo
       niche:
         description: '니치 필터 (빈값=전체)'
         required: false
         default: ''
 
+# 편집자가 WordPress에서 확인 후 공개. 수동 실행도 초안만 저장합니다.
+env:
+  EDITORIAL_REVIEW_REQUIRED: "true"
+
 permissions:
   contents: write
 
 jobs:
-  # ═══════════════════════════════════════════
-  # Fork 전용 — planxs-ai/wp-auto 이외의 모든 fork에서 실행
-  # GitHub Secrets 3개만 설정: SUPABASE_URL, SUPABASE_KEY, SITE_ID
-  # API 키는 대시보드 설정에서 입력 → Supabase에 저장됨
-  # ═══════════════════════════════════════════
-  fork-publish:
-    if: github.repository != 'planxs-ai/wp-auto'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      SITE_ID: ${{ secrets.SITE_ID }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Publish
-        env:
-          FORCE_RUN: 'true'
-        run: |
-          if [ -z "$SITE_ID" ]; then
-            echo "❌ SITE_ID 시크릿이 설정되지 않았습니다."
-            echo "GitHub Fork → Settings → Secrets → SITE_ID를 추가하세요."
-            exit 1
-          fi
-
-          COUNT="${{ github.event.inputs.count || '1' }}"
-          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-          PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
-          NICHE="${{ github.event.inputs.niche || '' }}"
-
-          ARGS="--site-id $SITE_ID --count $COUNT --pipeline $PIPELINE --golden"
-
-          if [ "$DRY_RUN" = "true" ]; then
-            ARGS="$ARGS --dry-run"
-          fi
-          if [ -n "$NICHE" ]; then
-            ARGS="$ARGS --niche \"$NICHE\""
-          fi
-
-          echo "▶ python scripts/main.py $ARGS"
-          python scripts/main.py $ARGS
-
-      - name: Commit used keywords
-        if: always()
-        run: |
-          git config user.email "bot@autoblog.com"
-          git config user.name "AutoBlog Bot"
-          git add data/used_keywords.json || true
-          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d)"
-          git push || true
-
-  # ═══ planx-ai.com (원본 전용) ═══
+  # ═══ planx-ai.com (site-1) ═══
   planx-ai:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # AdSense 콘텐츠 정비 중 예약 발행 중지. 검토 후 수동 실행만 허용.
     if: >-
       github.repository == 'planxs-ai/wp-auto'
       && github.event_name == 'workflow_dispatch'
+      && (inputs.site_id == '' || inputs.site_id == 'all' || inputs.site_id == 'site-1')
 
     env:
-      ALLOWED_SITE_IDS: "site-1,site-1775046458524"
       GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
@@ -146,26 +90,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Publish planx-ai.com
+      - name: Publish planx-ai.com (drafts)
         env:
           FORCE_RUN: 'true'
+          # 입력값은 스크립트에 직접 끼워 넣지 않고 환경변수로 넘긴다(따옴표·공백 안전).
+          IN_COUNT: ${{ inputs.count || '1' }}
+          IN_DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          IN_PIPELINE: ${{ inputs.pipeline || 'autoblog' }}
+          IN_NICHE: ${{ inputs.niche || '' }}
         run: |
-          COUNT="${{ github.event.inputs.count || '1' }}"
-          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-          PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
-          NICHE="${{ github.event.inputs.niche || '' }}"
-
-          ARGS="--site-id site-1 --count $COUNT --pipeline $PIPELINE --golden"
-
-          if [ "$DRY_RUN" = "true" ]; then
-            ARGS="$ARGS --dry-run"
-          fi
-          if [ -n "$NICHE" ]; then
-            ARGS="$ARGS --niche \"$NICHE\""
-          fi
-
-          echo "▶ planx-ai.com: python scripts/main.py $ARGS"
-          python scripts/main.py $ARGS
+          args=(--site-id site-1 --count "$IN_COUNT" --pipeline "$IN_PIPELINE" --golden)
+          if [ "$IN_DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          if [ -n "$IN_NICHE" ]; then args+=(--niche "$IN_NICHE"); fi
+          echo "▶ planx-ai.com: python scripts/main.py ${args[*]}"
+          python scripts/main.py "${args[@]}"
 
       - name: Commit used keywords
         if: always()
@@ -175,10 +113,12 @@ jobs:
 
           for attempt in 1 2 3; do
             git add data/used_keywords.json || true
+            git add data/quarantined_keywords.json || true
             git stash --include-untracked || true
             git pull --rebase || true
             git stash pop || true
             git add data/used_keywords.json || true
+            git add data/quarantined_keywords.json || true
             git diff --staged --quiet && echo "No changes to commit" && break
             git commit -m "chore: update used keywords [planx-ai] $(date +%Y-%m-%d)"
             if git push; then
@@ -190,18 +130,17 @@ jobs:
             sleep 5
           done
 
-  # ═══ bomissu.com ═══
+  # ═══ bomissu.com (site-1775046458524) ═══
   bomissu:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # AdSense 심사 감속(2026-06): 하루 1편만 발행(KST 08:30). 승인 후 '30 3'·'30 10' 스케줄 조건 복원.
+    # 예약 실행 없음. 수동 실행만 (2026-09-13). 이전 감속 스케줄 '30 23 * * *'은 재개 게이트 뒤에 복원 여부 결정.
     if: >-
       github.repository == 'planxs-ai/wp-auto'
-      && (github.event_name == 'workflow_dispatch'
-      || github.event_name == 'schedule' && github.event.schedule == '30 23 * * *')
+      && github.event_name == 'workflow_dispatch'
+      && (inputs.site_id == '' || inputs.site_id == 'all' || inputs.site_id == 'site-1775046458524')
 
     env:
-      ALLOWED_SITE_IDS: "site-1,site-1775046458524"
       GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
@@ -232,26 +171,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Publish bomissu.com
+      - name: Publish bomissu.com (drafts)
         env:
           FORCE_RUN: 'true'
+          IN_COUNT: ${{ inputs.count || '1' }}
+          IN_DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          IN_PIPELINE: ${{ inputs.pipeline || 'autoblog' }}
+          IN_NICHE: ${{ inputs.niche || '' }}
         run: |
-          COUNT="${{ github.event.inputs.count || '1' }}"
-          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-          PIPELINE="${{ github.event.inputs.pipeline || 'autoblog' }}"
-          NICHE="${{ github.event.inputs.niche || '' }}"
-
-          ARGS="--site-id site-1775046458524 --count $COUNT --pipeline $PIPELINE --golden"
-
-          if [ "$DRY_RUN" = "true" ]; then
-            ARGS="$ARGS --dry-run"
-          fi
-          if [ -n "$NICHE" ]; then
-            ARGS="$ARGS --niche \"$NICHE\""
-          fi
-
-          echo "▶ bomissu.com: python scripts/main.py $ARGS"
-          python scripts/main.py $ARGS
+          args=(--site-id site-1775046458524 --count "$IN_COUNT" --pipeline "$IN_PIPELINE" --golden)
+          if [ "$IN_DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          if [ -n "$IN_NICHE" ]; then args+=(--niche "$IN_NICHE"); fi
+          echo "▶ bomissu.com: python scripts/main.py ${args[*]}"
+          python scripts/main.py "${args[@]}"
 
       - name: Commit used keywords
         if: always()
@@ -261,10 +193,12 @@ jobs:
 
           for attempt in 1 2 3; do
             git add data/used_keywords.json || true
+            git add data/quarantined_keywords.json || true
             git stash --include-untracked || true
             git pull --rebase || true
             git stash pop || true
             git add data/used_keywords.json || true
+            git add data/quarantined_keywords.json || true
             git diff --staged --quiet && echo "No changes to commit" && break
             git commit -m "chore: update used keywords [bomissu] $(date +%Y-%m-%d)"
             if git push; then
