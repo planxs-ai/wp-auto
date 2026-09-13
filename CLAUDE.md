@@ -17,12 +17,14 @@ AutoBlog Engine v5.0 + Dashboard — AI 기반 자동 블로그 콘텐츠 생성
 ```
 scripts/main.py              → Content generation & WordPress publishing (Python)
 src/app/page.js              → Admin monitoring dashboard (React, "use client")
-src/app/(auth)/login/        → Consumer login/signup
-src/app/(consumer)/          → Consumer dashboard (dashboard, blog, revenue, settings, onboarding, upgrade)
-src/app/api/setup/route.js   → GitHub Actions trigger API (menu/css/publish)
-src/components/ui.js         → Shared UI components (Card, StatCard, Badge, etc.)
-src/lib/auth.js              → AuthProvider + consumer hooks (useCurrentUser, usePlanFeatures)
-src/lib/plan-features.js     → Standard/Premium/MaMa plan definitions & feature flags
+src/app/(auth)/login/        → Admin login only (no signup; consumer SaaS removed 2026-09-13)
+src/app/api/setup/route.js   → GitHub Actions trigger API (publish/menu/pages/css) — admin JWT required
+src/app/api/etf-report/      → ETF report workflow trigger — admin JWT required
+src/app/api/admin/me/        → AdminGate check (server-side requireAdmin; returns live_publish switch)
+src/app/api/health/          → Env presence check (booleans only)
+src/components/ui.js         → Shared UI components (Card, InputField, ActionButton, etc.)
+src/lib/admin-api.js         → Server-only: requireAdmin (JWT + ADMIN_USER_IDS allowlist + user_profiles.role),
+                               live-publish switch (PUBLISH_DISPATCH_ENABLED), dispatchWorkflow
 src/lib/hooks.js             → Admin dashboard hooks for Supabase data fetching
 src/lib/supabase.js          → Supabase client + auth helpers
 migrations/                  → Supabase SQL migrations
