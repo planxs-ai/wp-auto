@@ -16,116 +16,851 @@
     "비교 & 리뷰": "compare-review"
   },
   "keywords": [
-    {"keyword": "ChatGPT 활용법 2026 완벽 정리", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "chatgpt-guide-2026", "focus_keyword": "ChatGPT 활용법"},
-    {"keyword": "AI 글쓰기 도구 추천 2026", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "ai-writing-tools-2026", "focus_keyword": "AI 글쓰기 도구 추천"},
-    {"keyword": "AI 업무 자동화 도구 가이드", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "ai-productivity-tools-guide", "focus_keyword": "AI 업무 자동화"},
-    {"keyword": "AI 이미지 생성 도구 비교 2026", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "ai-image-generator-comparison", "focus_keyword": "AI 이미지 생성"},
-    {"keyword": "Gemini AI 활용 꿀팁 10가지", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "gemini-ai-tips-10", "focus_keyword": "Gemini AI 활용"},
-    {"keyword": "Perplexity AI 검색 완벽 가이드", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "perplexity-ai-guide", "focus_keyword": "Perplexity AI 사용법"},
-    {"keyword": "Claude AI vs ChatGPT 비교 2026", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "claude-vs-chatgpt-2026", "focus_keyword": "Claude ChatGPT 비교"},
-    {"keyword": "노션 활용법 업무 생산성 극대화", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "notion-productivity-guide", "focus_keyword": "노션 활용법"},
-    {"keyword": "AI 프레젠테이션 Gamma 활용법", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "gamma-ai-presentation", "focus_keyword": "AI 프레젠테이션 Gamma"},
-    {"keyword": "AI 번역 도구 DeepL vs 파파고 비교", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "ai-translation-comparison", "focus_keyword": "AI 번역 도구 추천"},
-    {"keyword": "무료 AI 도구 모음 2026 추천 리스트", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "free-ai-tools-2026", "focus_keyword": "무료 AI 도구 추천"},
-    {"keyword": "AI 코딩 도구 Cursor vs Copilot 비교", "type": "traffic", "intent": "informational", "category": "AI 활용 & 생산성", "pipeline": "autoblog", "slug": "cursor-vs-copilot", "focus_keyword": "AI 코딩 도구 비교"},
-
-    {"keyword": "ETF 초보자 입문 가이드 2026", "type": "conversion", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "etf-beginner-guide-2026", "focus_keyword": "ETF 초보자"},
-    {"keyword": "직장인 월급 관리법 50-30-20", "type": "traffic", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "salary-management-50-30-20", "focus_keyword": "직장인 월급 관리"},
-    {"keyword": "적금 vs ETF vs 예금 비교 2026", "type": "conversion", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "savings-vs-etf-comparison", "focus_keyword": "적금 ETF 비교"},
-    {"keyword": "미국 주식 투자 방법 초보 가이드", "type": "traffic", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "us-stock-investing-guide", "focus_keyword": "미국 주식 투자"},
-    {"keyword": "배당주 추천 2026 월배당 포트폴리오", "type": "conversion", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "dividend-stock-2026", "focus_keyword": "배당주 추천"},
-    {"keyword": "ISA 계좌 장단점 2026 절세 필수", "type": "traffic", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "isa-account-2026", "focus_keyword": "ISA 계좌 장단점"},
-    {"keyword": "연금저축 vs IRP 비교 세액공제", "type": "conversion", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "pension-vs-irp", "focus_keyword": "연금저축 IRP 비교"},
-    {"keyword": "신용점수 올리는 방법 실전 팁", "type": "traffic", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "credit-score-tips", "focus_keyword": "신용점수 올리기"},
-    {"keyword": "가계부 앱 추천 2026 자동 관리", "type": "traffic", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "budget-app-2026", "focus_keyword": "가계부 앱 추천"},
-    {"keyword": "비트코인 투자 초보 가이드 2026", "type": "traffic", "intent": "informational", "category": "재테크 & 투자", "pipeline": "autoblog", "slug": "bitcoin-beginner-2026", "focus_keyword": "비트코인 투자 초보"},
-
-    {"keyword": "블로그 수익화 방법 완벽 가이드", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "blog-monetization-guide", "focus_keyword": "블로그 수익화 방법"},
-    {"keyword": "직장인 부업 추천 2026 현실적", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "realistic-side-jobs-2026", "focus_keyword": "직장인 부업 추천"},
-    {"keyword": "쿠팡 파트너스 수익화 시작 방법", "type": "conversion", "intent": "transactional", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "coupang-partners-guide", "focus_keyword": "쿠팡 파트너스 수익화"},
-    {"keyword": "스마트스토어 창업 방법 2026", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "smartstore-startup-2026", "focus_keyword": "스마트스토어 창업"},
-    {"keyword": "유튜브 수익화 조건 2026 시작 가이드", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "youtube-monetization-2026", "focus_keyword": "유튜브 수익화 조건"},
-    {"keyword": "AI 부업 아이디어 2026 자동 수익", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "ai-side-hustle-2026", "focus_keyword": "AI 부업 아이디어"},
-    {"keyword": "애드센스 승인 방법 2026 블로그 조건", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "adsense-approval-2026", "focus_keyword": "애드센스 승인 방법"},
-    {"keyword": "워드프레스 블로그 시작 가이드 2026", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "wordpress-blog-start", "focus_keyword": "워드프레스 블로그 시작"},
-    {"keyword": "월 100만원 자동 수익 시스템 만들기", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "passive-income-system", "focus_keyword": "자동 수익 시스템"},
-    {"keyword": "개인사업자 등록 방법 절차 비용", "type": "traffic", "intent": "informational", "category": "부업 & 수익화", "pipeline": "autoblog", "slug": "business-registration-guide", "focus_keyword": "개인사업자 등록"},
-
-    {"keyword": "정부지원금 총정리 2026 놓치면 손해", "type": "traffic", "intent": "informational", "category": "정부지원 & 보조금", "pipeline": "autoblog", "slug": "government-subsidy-2026", "focus_keyword": "정부지원금 총정리"},
-    {"keyword": "청년도약계좌 가입 조건 혜택 2026", "type": "traffic", "intent": "informational", "category": "정부지원 & 보조금", "pipeline": "autoblog", "slug": "youth-savings-account-2026", "focus_keyword": "청년도약계좌"},
-    {"keyword": "실업급여 수급 조건 2026 자진퇴사", "type": "traffic", "intent": "informational", "category": "정부지원 & 보조금", "pipeline": "autoblog", "slug": "unemployment-benefit-2026", "focus_keyword": "실업급여 수급 조건"},
-    {"keyword": "전기차 보조금 2026 조건 신청 방법", "type": "traffic", "intent": "informational", "category": "정부지원 & 보조금", "pipeline": "autoblog", "slug": "ev-subsidy-2026", "focus_keyword": "전기차 보조금"},
-    {"keyword": "소상공인 지원금 2026 신청 총정리", "type": "traffic", "intent": "informational", "category": "정부지원 & 보조금", "pipeline": "autoblog", "slug": "small-biz-support-2026", "focus_keyword": "소상공인 지원금"},
-    {"keyword": "주거급여 신청 방법 조건 2026", "type": "traffic", "intent": "informational", "category": "정부지원 & 보조금", "pipeline": "autoblog", "slug": "housing-benefit-2026", "focus_keyword": "주거급여 신청"},
-    {"keyword": "국민취업지원제도 신청 방법 혜택", "type": "traffic", "intent": "informational", "category": "정부지원 & 보조금", "pipeline": "autoblog", "slug": "employment-support-program", "focus_keyword": "국민취업지원제도"},
-    {"keyword": "육아휴직 급여 2026 신청 방법 기간", "type": "traffic", "intent": "informational", "category": "정부지원 & 보조금", "pipeline": "autoblog", "slug": "parental-leave-pay-2026", "focus_keyword": "육아휴직 급여"},
-
-    {"keyword": "프리랜서 종합소득세 신고 방법", "type": "traffic", "intent": "informational", "category": "세무 & 절세", "pipeline": "autoblog", "slug": "freelancer-tax-filing", "focus_keyword": "프리랜서 종합소득세"},
-    {"keyword": "소상공인 절세 전략 5가지", "type": "traffic", "intent": "informational", "category": "세무 & 절세", "pipeline": "autoblog", "slug": "small-business-tax-saving", "focus_keyword": "소상공인 절세"},
-    {"keyword": "연말정산 환급 많이 받는 방법 2026", "type": "traffic", "intent": "informational", "category": "세무 & 절세", "pipeline": "autoblog", "slug": "year-end-tax-refund-2026", "focus_keyword": "연말정산 환급"},
-    {"keyword": "부업 소득 세금 신고 방법 주의사항", "type": "traffic", "intent": "informational", "category": "세무 & 절세", "pipeline": "autoblog", "slug": "side-income-tax-guide", "focus_keyword": "부업 세금 신고"},
-    {"keyword": "1인 법인 설립 장단점 절세 효과", "type": "traffic", "intent": "informational", "category": "세무 & 절세", "pipeline": "autoblog", "slug": "one-person-corp-tax", "focus_keyword": "1인 법인 절세"},
-    {"keyword": "부가세 신고 방법 초보 사업자 가이드", "type": "traffic", "intent": "informational", "category": "세무 & 절세", "pipeline": "autoblog", "slug": "vat-filing-beginner", "focus_keyword": "부가세 신고 방법"},
-    {"keyword": "간이과세자 vs 일반과세자 차이 선택", "type": "traffic", "intent": "informational", "category": "세무 & 절세", "pipeline": "autoblog", "slug": "simplified-vs-general-tax", "focus_keyword": "간이과세자 일반과세자"},
-    {"keyword": "경비처리 가능한 항목 사업자 절세", "type": "traffic", "intent": "informational", "category": "세무 & 절세", "pipeline": "autoblog", "slug": "business-expense-deduction", "focus_keyword": "경비처리 절세"},
-
-    {"keyword": "국내 여행지 추천 2026 가성비 코스", "type": "traffic", "intent": "informational", "category": "여행 & 라이프", "pipeline": "autoblog", "slug": "domestic-travel-2026", "focus_keyword": "국내 여행지 추천"},
-    {"keyword": "해외여행 준비물 체크리스트 2026", "type": "traffic", "intent": "informational", "category": "여행 & 라이프", "pipeline": "autoblog", "slug": "travel-checklist-2026", "focus_keyword": "해외여행 준비물"},
-    {"keyword": "일본 여행 가이드 2026 오사카 도쿄", "type": "traffic", "intent": "informational", "category": "여행 & 라이프", "pipeline": "autoblog", "slug": "japan-travel-guide-2026", "focus_keyword": "일본 여행 가이드"},
-    {"keyword": "제주도 숨은 명소 로컬 추천 코스", "type": "traffic", "intent": "informational", "category": "여행 & 라이프", "pipeline": "autoblog", "slug": "jeju-hidden-spots", "focus_keyword": "제주도 숨은 명소"},
-    {"keyword": "1인 가구 생활비 절약법 실전", "type": "traffic", "intent": "informational", "category": "여행 & 라이프", "pipeline": "autoblog", "slug": "single-household-saving", "focus_keyword": "1인 가구 생활비 절약"},
-    {"keyword": "전월세 계약 체크리스트 사기 방지", "type": "traffic", "intent": "informational", "category": "여행 & 라이프", "pipeline": "autoblog", "slug": "lease-contract-checklist", "focus_keyword": "전월세 계약 주의사항"},
-    {"keyword": "항공권 싸게 사는 방법 꿀팁 모음", "type": "traffic", "intent": "informational", "category": "여행 & 라이프", "pipeline": "autoblog", "slug": "cheap-flight-tips", "focus_keyword": "항공권 싸게 사는 법"},
-    {"keyword": "호캉스 추천 2026 가성비 호텔 리조트", "type": "traffic", "intent": "informational", "category": "여행 & 라이프", "pipeline": "autoblog", "slug": "hotel-staycation-2026", "focus_keyword": "호캉스 추천"},
-
-    {"keyword": "면역력 높이는 음식 습관 총정리", "type": "traffic", "intent": "informational", "category": "건강 & 웰니스", "pipeline": "autoblog", "slug": "immunity-boosting-foods", "focus_keyword": "면역력 높이는 음식"},
-    {"keyword": "홈트레이닝 루틴 초보자 4주 플랜", "type": "traffic", "intent": "informational", "category": "건강 & 웰니스", "pipeline": "autoblog", "slug": "home-workout-beginner", "focus_keyword": "홈트레이닝 루틴"},
-    {"keyword": "수면 질 높이는 방법 숙면 가이드", "type": "traffic", "intent": "informational", "category": "건강 & 웰니스", "pipeline": "autoblog", "slug": "sleep-quality-guide", "focus_keyword": "수면 질 높이기"},
-    {"keyword": "직장인 스트레스 해소법 실전 팁", "type": "traffic", "intent": "informational", "category": "건강 & 웰니스", "pipeline": "autoblog", "slug": "stress-relief-tips", "focus_keyword": "스트레스 해소법"},
-    {"keyword": "건강검진 항목 가이드 연령별 필수", "type": "traffic", "intent": "informational", "category": "건강 & 웰니스", "pipeline": "autoblog", "slug": "health-checkup-guide", "focus_keyword": "건강검진 항목"},
-    {"keyword": "단백질 보충제 추천 2026 비교 가이드", "type": "conversion", "intent": "transactional", "category": "건강 & 웰니스", "pipeline": "autoblog", "slug": "protein-supplement-2026", "focus_keyword": "단백질 보충제 추천"},
-    {"keyword": "눈 건강 관리법 디지털 피로 해소", "type": "traffic", "intent": "informational", "category": "건강 & 웰니스", "pipeline": "autoblog", "slug": "eye-health-digital-fatigue", "focus_keyword": "눈 건강 관리"},
-    {"keyword": "장 건강 유산균 추천 효과 비교", "type": "conversion", "intent": "transactional", "category": "건강 & 웰니스", "pipeline": "autoblog", "slug": "probiotics-comparison", "focus_keyword": "유산균 추천"},
-
-    {"keyword": "피부 타입별 스킨케어 루틴 가이드", "type": "traffic", "intent": "informational", "category": "뷰티 & 패션", "pipeline": "autoblog", "slug": "skincare-routine-guide", "focus_keyword": "스킨케어 루틴"},
-    {"keyword": "선크림 추천 2026 자외선 차단 비교", "type": "conversion", "intent": "transactional", "category": "뷰티 & 패션", "pipeline": "autoblog", "slug": "sunscreen-recommendation-2026", "focus_keyword": "선크림 추천"},
-    {"keyword": "남자 그루밍 기본 루틴 가이드", "type": "traffic", "intent": "informational", "category": "뷰티 & 패션", "pipeline": "autoblog", "slug": "mens-grooming-guide", "focus_keyword": "남자 그루밍"},
-    {"keyword": "가성비 화장품 브랜드 추천 2026", "type": "conversion", "intent": "transactional", "category": "뷰티 & 패션", "pipeline": "autoblog", "slug": "budget-cosmetics-2026", "focus_keyword": "가성비 화장품 추천"},
-    {"keyword": "계절별 패션 코디 가이드 기본템", "type": "traffic", "intent": "informational", "category": "뷰티 & 패션", "pipeline": "autoblog", "slug": "seasonal-fashion-guide", "focus_keyword": "계절별 패션 코디"},
-    {"keyword": "탈모 예방 샴푸 추천 관리법", "type": "conversion", "intent": "transactional", "category": "뷰티 & 패션", "pipeline": "autoblog", "slug": "hair-loss-shampoo-guide", "focus_keyword": "탈모 예방 샴푸"},
-
-    {"keyword": "가성비 노트북 추천 2026 용도별", "type": "conversion", "intent": "transactional", "category": "생활가전 & 스마트홈", "pipeline": "autoblog", "slug": "budget-laptop-2026", "focus_keyword": "가성비 노트북 추천"},
-    {"keyword": "무선 이어폰 추천 2026 가성비 순위", "type": "conversion", "intent": "transactional", "category": "생활가전 & 스마트홈", "pipeline": "autoblog", "slug": "wireless-earbuds-2026", "focus_keyword": "무선 이어폰 추천"},
-    {"keyword": "공기청정기 추천 2026 미세먼지 필수", "type": "conversion", "intent": "transactional", "category": "생활가전 & 스마트홈", "pipeline": "autoblog", "slug": "air-purifier-2026", "focus_keyword": "공기청정기 추천"},
-    {"keyword": "스마트홈 입문 가이드 IoT 기기 추천", "type": "traffic", "intent": "informational", "category": "생활가전 & 스마트홈", "pipeline": "autoblog", "slug": "smart-home-beginner", "focus_keyword": "스마트홈 입문"},
-    {"keyword": "로봇청소기 추천 2026 비교 순위", "type": "conversion", "intent": "transactional", "category": "생활가전 & 스마트홈", "pipeline": "autoblog", "slug": "robot-vacuum-2026", "focus_keyword": "로봇청소기 추천"},
-    {"keyword": "태블릿 추천 2026 아이패드 vs 갤럭시탭", "type": "conversion", "intent": "transactional", "category": "생활가전 & 스마트홈", "pipeline": "autoblog", "slug": "tablet-comparison-2026", "focus_keyword": "태블릿 추천"},
-    {"keyword": "모니터 추천 2026 재택근무 용도별", "type": "conversion", "intent": "transactional", "category": "생활가전 & 스마트홈", "pipeline": "autoblog", "slug": "monitor-recommendation-2026", "focus_keyword": "모니터 추천"},
-    {"keyword": "에어컨 추천 2026 전기세 절약 모델", "type": "conversion", "intent": "transactional", "category": "생활가전 & 스마트홈", "pipeline": "autoblog", "slug": "air-conditioner-2026", "focus_keyword": "에어컨 추천"},
-
-    {"keyword": "직장인 자기계발 방법 2026 루틴", "type": "traffic", "intent": "informational", "category": "교육 & 자기계발", "pipeline": "autoblog", "slug": "self-improvement-routine", "focus_keyword": "직장인 자기계발"},
-    {"keyword": "온라인 강의 플랫폼 비교 추천 2026", "type": "traffic", "intent": "informational", "category": "교육 & 자기계발", "pipeline": "autoblog", "slug": "online-learning-platform-2026", "focus_keyword": "온라인 강의 추천"},
-    {"keyword": "영어 독학 방법 2026 앱 추천", "type": "traffic", "intent": "informational", "category": "교육 & 자기계발", "pipeline": "autoblog", "slug": "english-self-study-2026", "focus_keyword": "영어 독학 방법"},
-    {"keyword": "독서 습관 만들기 추천 도서 리스트", "type": "traffic", "intent": "informational", "category": "교육 & 자기계발", "pipeline": "autoblog", "slug": "reading-habit-book-list", "focus_keyword": "독서 습관 만들기"},
-    {"keyword": "코딩 독학 로드맵 2026 초보 가이드", "type": "traffic", "intent": "informational", "category": "교육 & 자기계발", "pipeline": "autoblog", "slug": "coding-self-study-roadmap", "focus_keyword": "코딩 독학 로드맵"},
-    {"keyword": "자격증 추천 2026 취업 이직 유리한", "type": "traffic", "intent": "informational", "category": "교육 & 자기계발", "pipeline": "autoblog", "slug": "certification-recommendation-2026", "focus_keyword": "자격증 추천"},
-    {"keyword": "시간 관리 방법 생산성 높이기 실전", "type": "traffic", "intent": "informational", "category": "교육 & 자기계발", "pipeline": "autoblog", "slug": "time-management-tips", "focus_keyword": "시간 관리 방법"},
-    {"keyword": "AI 시대 필수 역량 미래 직업 전망", "type": "traffic", "intent": "informational", "category": "교육 & 자기계발", "pipeline": "autoblog", "slug": "ai-era-future-skills", "focus_keyword": "AI 시대 필수 역량"},
-
-    {"keyword": "2026 IT 트렌드 전망 AI 반도체 클라우드", "type": "traffic", "intent": "informational", "category": "행사 & 트렌드", "pipeline": "autoblog", "slug": "it-trends-2026", "focus_keyword": "2026 IT 트렌드"},
-    {"keyword": "CES 2026 주요 발표 기술 총정리", "type": "traffic", "intent": "informational", "category": "행사 & 트렌드", "pipeline": "autoblog", "slug": "ces-2026-highlights", "focus_keyword": "CES 2026"},
-    {"keyword": "MWC 2026 하이라이트 모바일 트렌드", "type": "traffic", "intent": "informational", "category": "행사 & 트렌드", "pipeline": "autoblog", "slug": "mwc-2026-highlights", "focus_keyword": "MWC 2026"},
-    {"keyword": "애플 이벤트 2026 신제품 총정리", "type": "traffic", "intent": "informational", "category": "행사 & 트렌드", "pipeline": "autoblog", "slug": "apple-event-2026", "focus_keyword": "애플 이벤트 2026"},
-    {"keyword": "갤럭시 언팩 2026 신제품 스펙 비교", "type": "traffic", "intent": "informational", "category": "행사 & 트렌드", "pipeline": "autoblog", "slug": "galaxy-unpacked-2026", "focus_keyword": "갤럭시 언팩 2026"},
-    {"keyword": "2026 하반기 경제 전망 금리 환율", "type": "traffic", "intent": "informational", "category": "행사 & 트렌드", "pipeline": "autoblog", "slug": "economic-outlook-2026", "focus_keyword": "2026 경제 전망"},
-
-    {"keyword": "실비보험 가입 가이드 연령별 비교", "type": "conversion", "intent": "transactional", "category": "비교 & 리뷰", "pipeline": "autoblog", "slug": "health-insurance-comparison", "focus_keyword": "실비보험 비교"},
-    {"keyword": "자동차보험 비교 갱신 절약 팁", "type": "conversion", "intent": "transactional", "category": "비교 & 리뷰", "pipeline": "autoblog", "slug": "car-insurance-comparison", "focus_keyword": "자동차보험 비교"},
-    {"keyword": "CMA 통장 추천 2026 금리 비교", "type": "conversion", "intent": "informational", "category": "비교 & 리뷰", "pipeline": "autoblog", "slug": "cma-account-comparison", "focus_keyword": "CMA 통장 추천"},
-    {"keyword": "대출 금리 비교 2026 주담대 신용", "type": "traffic", "intent": "informational", "category": "비교 & 리뷰", "pipeline": "autoblog", "slug": "loan-rate-comparison-2026", "focus_keyword": "대출 금리 비교"},
-    {"keyword": "OTT 서비스 비교 2026 넷플릭스 티빙 쿠팡플레이", "type": "traffic", "intent": "informational", "category": "비교 & 리뷰", "pipeline": "autoblog", "slug": "ott-comparison-2026", "focus_keyword": "OTT 비교"},
-    {"keyword": "통신사 요금제 비교 2026 알뜰폰", "type": "conversion", "intent": "transactional", "category": "비교 & 리뷰", "pipeline": "autoblog", "slug": "mobile-plan-comparison-2026", "focus_keyword": "통신사 요금제 비교"},
-    {"keyword": "전기차 vs 하이브리드 비교 2026 구매 가이드", "type": "traffic", "intent": "informational", "category": "비교 & 리뷰", "pipeline": "autoblog", "slug": "ev-vs-hybrid-2026", "focus_keyword": "전기차 하이브리드 비교"},
-    {"keyword": "정수기 추천 2026 렌탈 vs 구매 비교", "type": "conversion", "intent": "transactional", "category": "비교 & 리뷰", "pipeline": "autoblog", "slug": "water-purifier-2026", "focus_keyword": "정수기 추천 비교"}
+    {
+      "keyword": "ChatGPT 활용법 2026 완벽 정리",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "chatgpt-guide-2026",
+      "focus_keyword": "ChatGPT 활용법"
+    },
+    {
+      "keyword": "AI 글쓰기 도구 추천 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "ai-writing-tools-2026",
+      "focus_keyword": "AI 글쓰기 도구 추천"
+    },
+    {
+      "keyword": "AI 업무 자동화 도구 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "ai-productivity-tools-guide",
+      "focus_keyword": "AI 업무 자동화"
+    },
+    {
+      "keyword": "AI 이미지 생성 도구 비교 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "ai-image-generator-comparison",
+      "focus_keyword": "AI 이미지 생성"
+    },
+    {
+      "keyword": "Gemini AI 활용 꿀팁 10가지",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "gemini-ai-tips-10",
+      "focus_keyword": "Gemini AI 활용"
+    },
+    {
+      "keyword": "Perplexity AI 검색 완벽 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "perplexity-ai-guide",
+      "focus_keyword": "Perplexity AI 사용법"
+    },
+    {
+      "keyword": "Claude AI vs ChatGPT 비교 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "claude-vs-chatgpt-2026",
+      "focus_keyword": "Claude ChatGPT 비교"
+    },
+    {
+      "keyword": "노션 활용법 업무 생산성 극대화",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "notion-productivity-guide",
+      "focus_keyword": "노션 활용법"
+    },
+    {
+      "keyword": "AI 프레젠테이션 Gamma 활용법",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "gamma-ai-presentation",
+      "focus_keyword": "AI 프레젠테이션 Gamma"
+    },
+    {
+      "keyword": "AI 번역 도구 DeepL vs 파파고 비교",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "ai-translation-comparison",
+      "focus_keyword": "AI 번역 도구 추천"
+    },
+    {
+      "keyword": "무료 AI 도구 모음 2026 추천 리스트",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "free-ai-tools-2026",
+      "focus_keyword": "무료 AI 도구 추천"
+    },
+    {
+      "keyword": "AI 코딩 도구 Cursor vs Copilot 비교",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "AI 활용 & 생산성",
+      "pipeline": "autoblog",
+      "slug": "cursor-vs-copilot",
+      "focus_keyword": "AI 코딩 도구 비교"
+    },
+    {
+      "keyword": "ETF 초보자 입문 가이드 2026",
+      "type": "conversion",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "etf-beginner-guide-2026",
+      "focus_keyword": "ETF 초보자"
+    },
+    {
+      "keyword": "직장인 월급 관리법 50-30-20",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "salary-management-50-30-20",
+      "focus_keyword": "직장인 월급 관리"
+    },
+    {
+      "keyword": "적금 vs ETF vs 예금 비교 2026",
+      "type": "conversion",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "savings-vs-etf-comparison",
+      "focus_keyword": "적금 ETF 비교"
+    },
+    {
+      "keyword": "미국 주식 투자 방법 초보 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "us-stock-investing-guide",
+      "focus_keyword": "미국 주식 투자"
+    },
+    {
+      "keyword": "배당주 추천 2026 월배당 포트폴리오",
+      "type": "conversion",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "dividend-stock-2026",
+      "focus_keyword": "배당주 추천"
+    },
+    {
+      "keyword": "ISA 계좌 장단점 2026 절세 필수",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "isa-account-2026",
+      "focus_keyword": "ISA 계좌 장단점"
+    },
+    {
+      "keyword": "연금저축 vs IRP 비교 세액공제",
+      "type": "conversion",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "pension-vs-irp",
+      "focus_keyword": "연금저축 IRP 비교"
+    },
+    {
+      "keyword": "신용점수 올리는 방법 실전 팁",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "credit-score-tips",
+      "focus_keyword": "신용점수 올리기"
+    },
+    {
+      "keyword": "가계부 앱 추천 2026 자동 관리",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "budget-app-2026",
+      "focus_keyword": "가계부 앱 추천"
+    },
+    {
+      "keyword": "비트코인 투자 초보 가이드 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "재테크 & 투자",
+      "pipeline": "autoblog",
+      "slug": "bitcoin-beginner-2026",
+      "focus_keyword": "비트코인 투자 초보"
+    },
+    {
+      "keyword": "직장인 부업 추천 2026 현실적",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업 & 수익화",
+      "pipeline": "autoblog",
+      "slug": "realistic-side-jobs-2026",
+      "focus_keyword": "직장인 부업 추천"
+    },
+    {
+      "keyword": "스마트스토어 창업 방법 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업 & 수익화",
+      "pipeline": "autoblog",
+      "slug": "smartstore-startup-2026",
+      "focus_keyword": "스마트스토어 창업"
+    },
+    {
+      "keyword": "워드프레스 블로그 시작 가이드 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업 & 수익화",
+      "pipeline": "autoblog",
+      "slug": "wordpress-blog-start",
+      "focus_keyword": "워드프레스 블로그 시작"
+    },
+    {
+      "keyword": "개인사업자 등록 방법 절차 비용",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "부업 & 수익화",
+      "pipeline": "autoblog",
+      "slug": "business-registration-guide",
+      "focus_keyword": "개인사업자 등록"
+    },
+    {
+      "keyword": "정부지원금 총정리 2026 놓치면 손해",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "정부지원 & 보조금",
+      "pipeline": "autoblog",
+      "slug": "government-subsidy-2026",
+      "focus_keyword": "정부지원금 총정리"
+    },
+    {
+      "keyword": "청년도약계좌 가입 조건 혜택 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "정부지원 & 보조금",
+      "pipeline": "autoblog",
+      "slug": "youth-savings-account-2026",
+      "focus_keyword": "청년도약계좌"
+    },
+    {
+      "keyword": "실업급여 수급 조건 2026 자진퇴사",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "정부지원 & 보조금",
+      "pipeline": "autoblog",
+      "slug": "unemployment-benefit-2026",
+      "focus_keyword": "실업급여 수급 조건"
+    },
+    {
+      "keyword": "전기차 보조금 2026 조건 신청 방법",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "정부지원 & 보조금",
+      "pipeline": "autoblog",
+      "slug": "ev-subsidy-2026",
+      "focus_keyword": "전기차 보조금"
+    },
+    {
+      "keyword": "소상공인 지원금 2026 신청 총정리",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "정부지원 & 보조금",
+      "pipeline": "autoblog",
+      "slug": "small-biz-support-2026",
+      "focus_keyword": "소상공인 지원금"
+    },
+    {
+      "keyword": "주거급여 신청 방법 조건 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "정부지원 & 보조금",
+      "pipeline": "autoblog",
+      "slug": "housing-benefit-2026",
+      "focus_keyword": "주거급여 신청"
+    },
+    {
+      "keyword": "국민취업지원제도 신청 방법 혜택",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "정부지원 & 보조금",
+      "pipeline": "autoblog",
+      "slug": "employment-support-program",
+      "focus_keyword": "국민취업지원제도"
+    },
+    {
+      "keyword": "육아휴직 급여 2026 신청 방법 기간",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "정부지원 & 보조금",
+      "pipeline": "autoblog",
+      "slug": "parental-leave-pay-2026",
+      "focus_keyword": "육아휴직 급여"
+    },
+    {
+      "keyword": "프리랜서 종합소득세 신고 방법",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "세무 & 절세",
+      "pipeline": "autoblog",
+      "slug": "freelancer-tax-filing",
+      "focus_keyword": "프리랜서 종합소득세"
+    },
+    {
+      "keyword": "소상공인 절세 전략 5가지",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "세무 & 절세",
+      "pipeline": "autoblog",
+      "slug": "small-business-tax-saving",
+      "focus_keyword": "소상공인 절세"
+    },
+    {
+      "keyword": "연말정산 환급 많이 받는 방법 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "세무 & 절세",
+      "pipeline": "autoblog",
+      "slug": "year-end-tax-refund-2026",
+      "focus_keyword": "연말정산 환급"
+    },
+    {
+      "keyword": "부업 소득 세금 신고 방법 주의사항",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "세무 & 절세",
+      "pipeline": "autoblog",
+      "slug": "side-income-tax-guide",
+      "focus_keyword": "부업 세금 신고"
+    },
+    {
+      "keyword": "1인 법인 설립 장단점 절세 효과",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "세무 & 절세",
+      "pipeline": "autoblog",
+      "slug": "one-person-corp-tax",
+      "focus_keyword": "1인 법인 절세"
+    },
+    {
+      "keyword": "부가세 신고 방법 초보 사업자 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "세무 & 절세",
+      "pipeline": "autoblog",
+      "slug": "vat-filing-beginner",
+      "focus_keyword": "부가세 신고 방법"
+    },
+    {
+      "keyword": "간이과세자 vs 일반과세자 차이 선택",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "세무 & 절세",
+      "pipeline": "autoblog",
+      "slug": "simplified-vs-general-tax",
+      "focus_keyword": "간이과세자 일반과세자"
+    },
+    {
+      "keyword": "경비처리 가능한 항목 사업자 절세",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "세무 & 절세",
+      "pipeline": "autoblog",
+      "slug": "business-expense-deduction",
+      "focus_keyword": "경비처리 절세"
+    },
+    {
+      "keyword": "국내 여행지 추천 2026 가성비 코스",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "여행 & 라이프",
+      "pipeline": "autoblog",
+      "slug": "domestic-travel-2026",
+      "focus_keyword": "국내 여행지 추천"
+    },
+    {
+      "keyword": "해외여행 준비물 체크리스트 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "여행 & 라이프",
+      "pipeline": "autoblog",
+      "slug": "travel-checklist-2026",
+      "focus_keyword": "해외여행 준비물"
+    },
+    {
+      "keyword": "일본 여행 가이드 2026 오사카 도쿄",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "여행 & 라이프",
+      "pipeline": "autoblog",
+      "slug": "japan-travel-guide-2026",
+      "focus_keyword": "일본 여행 가이드"
+    },
+    {
+      "keyword": "제주도 숨은 명소 로컬 추천 코스",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "여행 & 라이프",
+      "pipeline": "autoblog",
+      "slug": "jeju-hidden-spots",
+      "focus_keyword": "제주도 숨은 명소"
+    },
+    {
+      "keyword": "1인 가구 생활비 절약법 실전",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "여행 & 라이프",
+      "pipeline": "autoblog",
+      "slug": "single-household-saving",
+      "focus_keyword": "1인 가구 생활비 절약"
+    },
+    {
+      "keyword": "전월세 계약 체크리스트 사기 방지",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "여행 & 라이프",
+      "pipeline": "autoblog",
+      "slug": "lease-contract-checklist",
+      "focus_keyword": "전월세 계약 주의사항"
+    },
+    {
+      "keyword": "항공권 싸게 사는 방법 꿀팁 모음",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "여행 & 라이프",
+      "pipeline": "autoblog",
+      "slug": "cheap-flight-tips",
+      "focus_keyword": "항공권 싸게 사는 법"
+    },
+    {
+      "keyword": "호캉스 추천 2026 가성비 호텔 리조트",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "여행 & 라이프",
+      "pipeline": "autoblog",
+      "slug": "hotel-staycation-2026",
+      "focus_keyword": "호캉스 추천"
+    },
+    {
+      "keyword": "면역력 높이는 음식 습관 총정리",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "건강 & 웰니스",
+      "pipeline": "autoblog",
+      "slug": "immunity-boosting-foods",
+      "focus_keyword": "면역력 높이는 음식"
+    },
+    {
+      "keyword": "홈트레이닝 루틴 초보자 4주 플랜",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "건강 & 웰니스",
+      "pipeline": "autoblog",
+      "slug": "home-workout-beginner",
+      "focus_keyword": "홈트레이닝 루틴"
+    },
+    {
+      "keyword": "수면 질 높이는 방법 숙면 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "건강 & 웰니스",
+      "pipeline": "autoblog",
+      "slug": "sleep-quality-guide",
+      "focus_keyword": "수면 질 높이기"
+    },
+    {
+      "keyword": "직장인 스트레스 해소법 실전 팁",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "건강 & 웰니스",
+      "pipeline": "autoblog",
+      "slug": "stress-relief-tips",
+      "focus_keyword": "스트레스 해소법"
+    },
+    {
+      "keyword": "건강검진 항목 가이드 연령별 필수",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "건강 & 웰니스",
+      "pipeline": "autoblog",
+      "slug": "health-checkup-guide",
+      "focus_keyword": "건강검진 항목"
+    },
+    {
+      "keyword": "단백질 보충제 추천 2026 비교 가이드",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "건강 & 웰니스",
+      "pipeline": "autoblog",
+      "slug": "protein-supplement-2026",
+      "focus_keyword": "단백질 보충제 추천"
+    },
+    {
+      "keyword": "눈 건강 관리법 디지털 피로 해소",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "건강 & 웰니스",
+      "pipeline": "autoblog",
+      "slug": "eye-health-digital-fatigue",
+      "focus_keyword": "눈 건강 관리"
+    },
+    {
+      "keyword": "장 건강 유산균 추천 효과 비교",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "건강 & 웰니스",
+      "pipeline": "autoblog",
+      "slug": "probiotics-comparison",
+      "focus_keyword": "유산균 추천"
+    },
+    {
+      "keyword": "피부 타입별 스킨케어 루틴 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "뷰티 & 패션",
+      "pipeline": "autoblog",
+      "slug": "skincare-routine-guide",
+      "focus_keyword": "스킨케어 루틴"
+    },
+    {
+      "keyword": "선크림 추천 2026 자외선 차단 비교",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "뷰티 & 패션",
+      "pipeline": "autoblog",
+      "slug": "sunscreen-recommendation-2026",
+      "focus_keyword": "선크림 추천"
+    },
+    {
+      "keyword": "남자 그루밍 기본 루틴 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "뷰티 & 패션",
+      "pipeline": "autoblog",
+      "slug": "mens-grooming-guide",
+      "focus_keyword": "남자 그루밍"
+    },
+    {
+      "keyword": "가성비 화장품 브랜드 추천 2026",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "뷰티 & 패션",
+      "pipeline": "autoblog",
+      "slug": "budget-cosmetics-2026",
+      "focus_keyword": "가성비 화장품 추천"
+    },
+    {
+      "keyword": "계절별 패션 코디 가이드 기본템",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "뷰티 & 패션",
+      "pipeline": "autoblog",
+      "slug": "seasonal-fashion-guide",
+      "focus_keyword": "계절별 패션 코디"
+    },
+    {
+      "keyword": "탈모 예방 샴푸 추천 관리법",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "뷰티 & 패션",
+      "pipeline": "autoblog",
+      "slug": "hair-loss-shampoo-guide",
+      "focus_keyword": "탈모 예방 샴푸"
+    },
+    {
+      "keyword": "가성비 노트북 추천 2026 용도별",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "생활가전 & 스마트홈",
+      "pipeline": "autoblog",
+      "slug": "budget-laptop-2026",
+      "focus_keyword": "가성비 노트북 추천"
+    },
+    {
+      "keyword": "무선 이어폰 추천 2026 가성비 순위",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "생활가전 & 스마트홈",
+      "pipeline": "autoblog",
+      "slug": "wireless-earbuds-2026",
+      "focus_keyword": "무선 이어폰 추천"
+    },
+    {
+      "keyword": "공기청정기 추천 2026 미세먼지 필수",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "생활가전 & 스마트홈",
+      "pipeline": "autoblog",
+      "slug": "air-purifier-2026",
+      "focus_keyword": "공기청정기 추천"
+    },
+    {
+      "keyword": "스마트홈 입문 가이드 IoT 기기 추천",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "생활가전 & 스마트홈",
+      "pipeline": "autoblog",
+      "slug": "smart-home-beginner",
+      "focus_keyword": "스마트홈 입문"
+    },
+    {
+      "keyword": "로봇청소기 추천 2026 비교 순위",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "생활가전 & 스마트홈",
+      "pipeline": "autoblog",
+      "slug": "robot-vacuum-2026",
+      "focus_keyword": "로봇청소기 추천"
+    },
+    {
+      "keyword": "태블릿 추천 2026 아이패드 vs 갤럭시탭",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "생활가전 & 스마트홈",
+      "pipeline": "autoblog",
+      "slug": "tablet-comparison-2026",
+      "focus_keyword": "태블릿 추천"
+    },
+    {
+      "keyword": "모니터 추천 2026 재택근무 용도별",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "생활가전 & 스마트홈",
+      "pipeline": "autoblog",
+      "slug": "monitor-recommendation-2026",
+      "focus_keyword": "모니터 추천"
+    },
+    {
+      "keyword": "에어컨 추천 2026 전기세 절약 모델",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "생활가전 & 스마트홈",
+      "pipeline": "autoblog",
+      "slug": "air-conditioner-2026",
+      "focus_keyword": "에어컨 추천"
+    },
+    {
+      "keyword": "직장인 자기계발 방법 2026 루틴",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "교육 & 자기계발",
+      "pipeline": "autoblog",
+      "slug": "self-improvement-routine",
+      "focus_keyword": "직장인 자기계발"
+    },
+    {
+      "keyword": "온라인 강의 플랫폼 비교 추천 2026",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "교육 & 자기계발",
+      "pipeline": "autoblog",
+      "slug": "online-learning-platform-2026",
+      "focus_keyword": "온라인 강의 추천"
+    },
+    {
+      "keyword": "영어 독학 방법 2026 앱 추천",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "교육 & 자기계발",
+      "pipeline": "autoblog",
+      "slug": "english-self-study-2026",
+      "focus_keyword": "영어 독학 방법"
+    },
+    {
+      "keyword": "독서 습관 만들기 추천 도서 리스트",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "교육 & 자기계발",
+      "pipeline": "autoblog",
+      "slug": "reading-habit-book-list",
+      "focus_keyword": "독서 습관 만들기"
+    },
+    {
+      "keyword": "코딩 독학 로드맵 2026 초보 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "교육 & 자기계발",
+      "pipeline": "autoblog",
+      "slug": "coding-self-study-roadmap",
+      "focus_keyword": "코딩 독학 로드맵"
+    },
+    {
+      "keyword": "자격증 추천 2026 취업 이직 유리한",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "교육 & 자기계발",
+      "pipeline": "autoblog",
+      "slug": "certification-recommendation-2026",
+      "focus_keyword": "자격증 추천"
+    },
+    {
+      "keyword": "시간 관리 방법 생산성 높이기 실전",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "교육 & 자기계발",
+      "pipeline": "autoblog",
+      "slug": "time-management-tips",
+      "focus_keyword": "시간 관리 방법"
+    },
+    {
+      "keyword": "AI 시대 필수 역량 미래 직업 전망",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "교육 & 자기계발",
+      "pipeline": "autoblog",
+      "slug": "ai-era-future-skills",
+      "focus_keyword": "AI 시대 필수 역량"
+    },
+    {
+      "keyword": "2026 IT 트렌드 전망 AI 반도체 클라우드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "행사 & 트렌드",
+      "pipeline": "autoblog",
+      "slug": "it-trends-2026",
+      "focus_keyword": "2026 IT 트렌드"
+    },
+    {
+      "keyword": "CES 2026 주요 발표 기술 총정리",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "행사 & 트렌드",
+      "pipeline": "autoblog",
+      "slug": "ces-2026-highlights",
+      "focus_keyword": "CES 2026"
+    },
+    {
+      "keyword": "MWC 2026 하이라이트 모바일 트렌드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "행사 & 트렌드",
+      "pipeline": "autoblog",
+      "slug": "mwc-2026-highlights",
+      "focus_keyword": "MWC 2026"
+    },
+    {
+      "keyword": "애플 이벤트 2026 신제품 총정리",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "행사 & 트렌드",
+      "pipeline": "autoblog",
+      "slug": "apple-event-2026",
+      "focus_keyword": "애플 이벤트 2026"
+    },
+    {
+      "keyword": "갤럭시 언팩 2026 신제품 스펙 비교",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "행사 & 트렌드",
+      "pipeline": "autoblog",
+      "slug": "galaxy-unpacked-2026",
+      "focus_keyword": "갤럭시 언팩 2026"
+    },
+    {
+      "keyword": "2026 하반기 경제 전망 금리 환율",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "행사 & 트렌드",
+      "pipeline": "autoblog",
+      "slug": "economic-outlook-2026",
+      "focus_keyword": "2026 경제 전망"
+    },
+    {
+      "keyword": "실비보험 가입 가이드 연령별 비교",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "비교 & 리뷰",
+      "pipeline": "autoblog",
+      "slug": "health-insurance-comparison",
+      "focus_keyword": "실비보험 비교"
+    },
+    {
+      "keyword": "자동차보험 비교 갱신 절약 팁",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "비교 & 리뷰",
+      "pipeline": "autoblog",
+      "slug": "car-insurance-comparison",
+      "focus_keyword": "자동차보험 비교"
+    },
+    {
+      "keyword": "CMA 통장 추천 2026 금리 비교",
+      "type": "conversion",
+      "intent": "informational",
+      "category": "비교 & 리뷰",
+      "pipeline": "autoblog",
+      "slug": "cma-account-comparison",
+      "focus_keyword": "CMA 통장 추천"
+    },
+    {
+      "keyword": "대출 금리 비교 2026 주담대 신용",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "비교 & 리뷰",
+      "pipeline": "autoblog",
+      "slug": "loan-rate-comparison-2026",
+      "focus_keyword": "대출 금리 비교"
+    },
+    {
+      "keyword": "OTT 서비스 비교 2026 넷플릭스 티빙 쿠팡플레이",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "비교 & 리뷰",
+      "pipeline": "autoblog",
+      "slug": "ott-comparison-2026",
+      "focus_keyword": "OTT 비교"
+    },
+    {
+      "keyword": "통신사 요금제 비교 2026 알뜰폰",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "비교 & 리뷰",
+      "pipeline": "autoblog",
+      "slug": "mobile-plan-comparison-2026",
+      "focus_keyword": "통신사 요금제 비교"
+    },
+    {
+      "keyword": "전기차 vs 하이브리드 비교 2026 구매 가이드",
+      "type": "traffic",
+      "intent": "informational",
+      "category": "비교 & 리뷰",
+      "pipeline": "autoblog",
+      "slug": "ev-vs-hybrid-2026",
+      "focus_keyword": "전기차 하이브리드 비교"
+    },
+    {
+      "keyword": "정수기 추천 2026 렌탈 vs 구매 비교",
+      "type": "conversion",
+      "intent": "transactional",
+      "category": "비교 & 리뷰",
+      "pipeline": "autoblog",
+      "slug": "water-purifier-2026",
+      "focus_keyword": "정수기 추천 비교"
+    }
   ]
 }
