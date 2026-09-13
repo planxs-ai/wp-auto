@@ -214,13 +214,13 @@ const ADSENSE_ITEMS = [
 
 const STAGES = [
   { id: 1, label: 'AdSense 승인', color: '#3b82f6', qg: 85,
-    desc: '양질의 콘텐츠로 Google AdSense 승인을 획득합니다. 제휴 링크 없이 순수 정보성 글만 발행합니다.',
+    desc: '심사 준비용 초안을 작성하고 WordPress에서 근거를 확인한 뒤 공개합니다. 승인은 Google 심사로 결정됩니다.',
     features: ['제휴 링크 OFF', '품질 85점+ 게이트', '정보성 키워드 100%', '필수 페이지 체크'],
     kwMix: '정보 100%',
     guide: [
-      { t: 'AdSense 승인 조건', b: '20편 이상의 고유 콘텐츠, 필수 페이지(About/Privacy/Contact/Disclaimer/Terms), HTTPS, 모바일 반응형이 핵심입니다.' },
-      { t: '신청 절차', b: '1) adsense.google.com 접속 → 2) 사이트 URL 입력 → 3) 코드 붙여넣기 → 4) 검토 요청 → 5) 2~14일 대기. 거절 시 콘텐츠 보강 후 재신청 가능합니다.' },
-      { t: '거절 대처법', b: '글 수 부족이 가장 흔한 사유입니다. 30편 이상으로 보강하고 1주 후 재신청하세요. 얇은 콘텐츠(1000자 미만) 삭제도 효과적입니다.' },
+      { t: 'AdSense 승인 조건', b: 'Google은 독창적이고 유용한 콘텐츠와 명확한 탐색 구조를 확인합니다. 개인정보처리방침의 광고 쿠키 안내도 필요합니다. 글 20편과 내부 점수는 자체 점검 기준이며 승인 조건이나 보장이 아닙니다.' },
+      { t: '신청 절차', b: '1) 공개 사이트와 정책 페이지 점검 → 2) AdSense에 사이트 추가 → 3) 계정에 표시된 사이트 연결 절차 수행 → 4) 검토 요청. 심사 상태와 안내는 AdSense에서 확인하세요.' },
+      { t: '거절 대처법', b: 'AdSense에 표시된 거절 사유부터 확인하세요. 원문 근거, 독창적인 설명, 미완성 페이지와 탐색 오류를 수정한 뒤 재검토합니다. 글 길이나 개수만으로 삭제·재신청을 결정하지 않습니다.' },
     ],
   },
   { id: 2, label: '수익화 시작', color: '#f59e0b', qg: 80,
@@ -1080,10 +1080,10 @@ function NicheTab({ selNiches, toggleNiche, siteId }) {
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                   }}>{p.title}</div>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                    {p.keyword} · {new Date(p.published_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                    {p.keyword} · {new Date(p.published_at || p.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                   </div>
                 </div>
-                <Badge text={p.status === 'published' ? '발행' : '실패'} color={p.status === 'published' ? 'green' : 'red'} />
+                <Badge text={p.status === 'published' ? '발행' : p.status === 'draft' ? '검토 대기' : '실패'} color={p.status === 'published' ? 'green' : p.status === 'draft' ? 'yellow' : 'red'} />
               </div>
             ))}
           </div>
@@ -1642,8 +1642,8 @@ function StageTab({ monStage, setMonStage, stageConfirmed, setStageConfirmed,
           </div>
           {monStage === 1 ? (
             <>
-              <StageCondition ok={totalPublished >= 20} label={`글 20편 이상 (현재: ${totalPublished}편)`} />
-              <StageCondition ok={essentialOk} label="필수 페이지 완료 (About, Privacy, Contact, 메뉴)" />
+              <StageCondition ok={totalPublished >= 20} label={`자체 검토 목표 20편 (Google 승인 기준 아님 · 현재: ${totalPublished}편)`} />
+              <StageCondition ok={essentialOk} label="사이트 정보·개인정보처리방침·문의·메뉴 직접 확인" />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
                 <button onClick={() => setStageConfirmed(p => ({ ...p, adsense_approved: !p.adsense_approved }))} style={{
                   width: 20, height: 20, borderRadius: 5, border: 'none', cursor: 'pointer',
@@ -2371,7 +2371,7 @@ function PostsTab({ siteId }) {
               {posts.map(p => (
                 <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '12px 8px', whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>
-                    {new Date(p.published_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {new Date(p.published_at || p.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td style={{ padding: '12px 8px', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a2e' }}>
                     {p.url ? (
