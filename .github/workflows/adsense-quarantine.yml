@@ -1,6 +1,10 @@
 name: AdSense keep five reviewed posts
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/adsense-quarantine.yml"
   workflow_dispatch:
     inputs:
       apply:
@@ -28,7 +32,7 @@ jobs:
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
         run: >-
           python scripts/quarantine_adsense_posts.py
-          ${{ inputs.apply == 'true' && '--apply' || '' }}
+          ${{ github.event_name == 'push' && '--apply' || (inputs.apply == 'true' && '--apply' || '') }}
       - name: Preserve rollback backup
         uses: actions/upload-artifact@v4
         if: always()
