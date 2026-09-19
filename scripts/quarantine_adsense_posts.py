@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Move unverified high-risk PlanX posts to draft with a complete JSON backup."""
+"""Keep the five reviewed PlanX posts public and move every other post to draft."""
 import argparse
 import json
 import os
@@ -9,7 +9,6 @@ from pathlib import Path
 import requests
 
 SITE = "https://planx-ai.com"
-RISK_FLAGS = {"experience_evidence_required", "unsupported_outcome_review"}
 KEEP_PUBLIC = {1426, 1427, 1428, 1429, 1430}
 
 
@@ -19,7 +18,6 @@ def candidate_ids(plan):
         for row in plan["rows"]
         if row.get("kind", "posts") == "posts"
         and int(row["id"]) not in KEEP_PUBLIC
-        and RISK_FLAGS.intersection(row.get("review_flags", []))
     })
 
 
@@ -27,7 +25,12 @@ def quarantine(plan, session, apply=False):
     if plan.get("site") != SITE or plan.get("version") != 1:
         raise ValueError("Unexpected plan target or version")
     ids = candidate_ids(plan)
-    if not 1 <= len(ids) <= 500:
+    plan_post_ids = {int(row["id"]) for row in plan["rows"]
+                     if row.get("kind", "posts") == "posts"}
+    expected = len(plan_post_ids - KEEP_PUBLIC)
+    if int(plan.get("post_count", 0)) != len(plan_post_ids):
+        raise ValueError("Plan post count does not match its rows")
+    if len(ids) != expected or not 1 <= len(ids) <= 700:
         raise ValueError(f"Refusing unexpected candidate count: {len(ids)}")
     result = {"site": SITE, "created_at": datetime.now(timezone.utc).isoformat(),
               "apply": apply, "candidate_count": len(ids), "items": []}
