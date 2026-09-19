@@ -1,10 +1,10 @@
-name: AdSense quarantine high-risk posts
+name: AdSense keep five reviewed posts
 
 on:
   workflow_dispatch:
     inputs:
       apply:
-        description: "Set true to move selected published posts to draft"
+        description: "Set true to keep only the five reviewed posts public"
         required: true
         default: "false"
         type: choice
