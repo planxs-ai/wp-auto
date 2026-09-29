@@ -1,0 +1,4 @@
+# 테스트 전용 의존성 — 런타임(requirements.txt)에는 넣지 않는다.
+# 발행 워크플로들도 requirements.txt 를 설치하므로 pytest 를 거기 넣으면 운영 설치가 불필요하게 무거워진다.
+-r requirements.txt
+pytest>=8,<9

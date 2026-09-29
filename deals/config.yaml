@@ -1,0 +1,98 @@
+# deals/ — 쿠팡 가격 데이터 딜 엔진 설정 (밑그림 docs/blueprints/20260907-shopping-affiliate-automation.md §9)
+# 원칙: API 스펙(엔드포인트·필드명)은 코드가 아니라 이 파일에서만 바꾼다. 키·토큰은 환경변수만.
+
+api:
+  base_url: https://api-gateway.coupang.com
+  # 경로는 2차 출처 기준 [추정] — 대표 계정의 developers.coupang.com 문서와 대조 후 확정할 것
+  paths:
+    goldbox: /v2/providers/affiliate_open_api/apis/openapi/v1/products/goldbox
+    bestcategory: /v2/providers/affiliate_open_api/apis/openapi/v1/products/bestcategories/{category_id}
+    search: /v2/providers/affiliate_open_api/apis/openapi/products/search
+    deeplink: /v2/providers/affiliate_open_api/apis/openapi/v1/deeplink
+  timeout_sec: 20
+  retries: 2                  # 연결 오류·5xx에 한해 재시도(지수 백오프)
+  circuit_breaker_failures: 3 # 연속 3회 연결 실패·5xx·비JSON → UPSTREAM_DOWN 즉시 중단 (bid S2.4 이식)
+
+budget:
+  daily_call_budget: 400      # 전 오퍼레이션 합계, 하루(KST). DB 실사용 기준으로 preflight 차감
+  hourly:
+    search: 10                # 검색 API 시간당 10회 [단일 출처·추정] — 대표 확인 §13-1
+    bestcategory: 60
+    goldbox: 6
+    deeplink: 60
+
+# 응답 필드 매핑 — 실응답과 다르면 여기만 고친다
+field_map:
+  envelope_data: data
+  envelope_code: rCode
+  envelope_ok_code: "0"
+  search_items: productData     # search 응답은 data.productData[] 구조 [추정]
+  product:
+    product_id: productId
+    name: productName
+    price: productPrice
+    image: productImage
+    url: productUrl
+    category: categoryName
+    rocket: isRocket
+    free_shipping: isFreeShipping
+    rank: rank
+    discount_rate: discountRate # 없으면 null — 감지기는 가격 이력을 우선한다
+  deeplink:
+    original: originalUrl
+    short: shortenUrl
+    landing: landingUrl
+
+collection:
+  # MVP = 카테고리 1개(반복구매 생필품). 베스트카테고리 ID는 파트너스 문서 기준 [추정]
+  best_categories:
+    - {id: "1012", name: "식품"}
+    - {id: "1014", name: "생활용품"}
+    - {id: "1011", name: "출산/유아동"}
+    - {id: "1024", name: "헬스/건강식품"}
+  best_limit: 100
+  goldbox: true
+  # 관찰 목록(검색 API 일 1회, 키워드당 1콜) — §7 W1 ⓐ. 하루 240콜 안에서.
+  watch_keywords:
+    - 기저귀
+    - 분유
+    - 생수 2L
+    - 커피 캡슐
+    - 세탁세제
+    - 종합비타민
+    - 물티슈
+    - 화장지
+  search_limit: 20
+
+detector:
+  min_history_days: 7         # 이력 7일 미만이면 발행 금지(수집 N일차 표기 이전 단계)
+  full_window_days: 90        # "90일 최저" 표현은 이력이 90일 이상일 때만 해금(§7 D+90)
+  min_drop_pct: 10            # 수집 기간 최저 대비 -10% 이상이거나
+  discount_jump_pp: 10        # 할인율이 직전 대비 +10%p 이상이면 딜
+  min_price_krw: 3000         # 소액 상품 제외(수수료 무의미)
+  dedupe_days: 3              # 같은 상품 같은 종류 딜은 3일에 1회
+
+publish:
+  disclosure: "[광고] 이 게시물은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
+  daily_cap:
+    telegram: 5
+    wordpress: 3
+  telegram:
+    enabled: true
+    parse_mode: HTML
+    link_target: wp            # §13-6 확인 전엔 텔레그램에는 WP 딜 페이지 링크만 ('wp' | 'deeplink')
+  wordpress:
+    enabled: true
+    status: draft              # draft → 대표 검수 후 publish. 자동 publish는 §13-4 확정 후
+    category_slug: deal
+    noindex: true              # 데이터 페이지는 noindex 기본(반론 §15-3)
+    rank_math_robots_meta: rank_math_robots
+  forbidden_phrases:           # §9 발행 규칙 — 확률식·과장 표현 금지
+    - 무조건 최저
+    - 역대 최저가 보장
+    - 100% 최저
+    - 지금 아니면
+
+runtime:
+  soft_minutes: 12             # 잡 타임아웃(20분) 전에 스스로 멈춘다 (bid §7-1 이식)
+  hard_minutes: 15

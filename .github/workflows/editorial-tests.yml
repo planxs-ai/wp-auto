@@ -6,6 +6,7 @@ on:
       - 'tests/**'
       - 'data/**'
       - 'requirements.txt'
+      - 'requirements-dev.txt'
       - '.github/workflows/publish.yml'
       - '.github/workflows/publish-golden.yml'
       - '.github/workflows/editorial-tests.yml'
@@ -20,6 +21,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
       - run: python -m py_compile scripts/*.py
       - run: python -m unittest discover -s tests -v
+      # deals 엔진 회귀 기준선은 pytest 문법(fixture·monkeypatch)이라 unittest discover 로는
+      # 0건 수집된다 — 따로 돌려야 실제로 검증된다.
+      - run: python -m pytest tests/test_deals.py -q
