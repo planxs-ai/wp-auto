@@ -2,12 +2,17 @@
 """
 ETF 블로그 리포트 발행 모듈
 =============================
-ETF Dashboard API → 리포트 JSON fetch → AI 전문가 톤 블로그 글 생성 → WordPress 발행
+ETF Dashboard API → 리포트 JSON fetch → AI 전문가 톤 블로그 글 생성 → WordPress 초안 저장
+
+안전장치 (2026-09-14):
+  - planx-ai.com(site-1) 전용. SITE_ID와 WP_URL 호스트가 함께 맞아야 한다(아니면 exit 1).
+  - 기본은 초안. EDITORIAL_REVIEW_REQUIRED가 정확히 'false'일 때만 공개하고, 공개된 글만 SNS에 알린다.
+  - Supabase sites.status가 paused면 ETF API·AI 호출 전에 멈춘다.
 
 사용:
-  python scripts/etf_report.py                    # 일간 리포트 발행
-  python scripts/etf_report.py --dry-run           # 테스트 (발행 안 함)
-  python scripts/etf_report.py --report-type daily  # daily/rotation/performance/full
+  SITE_ID=site-1 python scripts/etf_report.py                    # 일간 리포트 (초안)
+  SITE_ID=site-1 python scripts/etf_report.py --dry-run           # 테스트 (저장 안 함)
+  SITE_ID=site-1 python scripts/etf_report.py --report-type daily  # daily/rotation/performance/blog-ready
 """
 
 import os
@@ -43,7 +48,17 @@ GROK_KEY = os.environ.get("GROK_API_KEY", "")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-SITE_ID = os.environ.get("SITE_ID", "site-1")
+# 기본값 없음: 대상 사이트는 명시해야 한다 (etf-report.yml은 SITE_ID: site-1을 넘긴다).
+SITE_ID = os.environ.get("SITE_ID", "")
+
+# 발행 대상 가드 (main.py와 같은 중립 모듈). ID와 WP 호스트를 함께 확인한다.
+try:
+    from .site_guard import OWNED_SITES, wp_host, wp_url_allowed, editorial_review_required
+except ImportError:
+    from site_guard import OWNED_SITES, wp_host, wp_url_allowed, editorial_review_required
+
+# ETF 리포트는 planx-ai.com(재테크) 전용이다. 본문 내부 링크·SEO 제목에 PlanX 브랜드가 들어간다.
+ETF_SITE_ID = "site-1"
 
 
 # ═══════════════════════════════════════════════════════
@@ -723,10 +738,17 @@ def _get_or_create_category_robust(url: str, headers: dict, name: str) -> int | 
 
 
 def publish_to_wordpress(title: str, content: str, category: str = "재테크 & 투자",
-                         leading_sectors: list = None, target_stock: str = "") -> dict:
-    """WordPress REST API로 발행"""
+                         leading_sectors: list = None, target_stock: str = "",
+                         status: str = "draft") -> dict:
+    """WordPress REST API로 저장. 기본은 초안(draft). 공개는 호출자가 status='publish'를 명시할 때만.
+
+    반환 status: 'draft' | 'published' | 'failed' (요청과 다른 상태로 저장돼도 'failed').
+    """
     import base64
     import requests
+
+    if status not in ("draft", "publish"):
+        raise ValueError("Unsupported WordPress post status")
 
     url = WP_URL.rstrip("/")
     if url.endswith("/wp-json/wp/v2"):
@@ -760,7 +782,7 @@ def publish_to_wordpress(title: str, content: str, category: str = "재테크 & 
     post_data = {
         "title": title,
         "content": content,
-        "status": "publish",
+        "status": status,
         "slug": f"3days-strategy-report-{today_compact}",
         "categories": [cat_id] if cat_id else [],
         "tags": tag_ids,
@@ -780,15 +802,20 @@ def publish_to_wordpress(title: str, content: str, category: str = "재테크 & 
         )
         resp.raise_for_status()
         data = resp.json()
+        # 요청한 상태로 저장됐는지 확인한다. 다르면 성공으로 치지 않는다(재시도 전 사람이 확인).
+        if data.get("status") != status:
+            log.error(f"WordPress 상태 불일치: 요청 {status}, 응답 {data.get('status')} (post_id={data.get('id')})")
+            return {"status": "failed", "id": data.get("id"), "url": data.get("link", ""), "title": title,
+                    "error": "WordPress status mismatch; inspect post before retry"}
         return {
-            "status": "published",
+            "status": "published" if status == "publish" else "draft",
             "id": data["id"],
             "url": data.get("link", ""),
             "title": data.get("title", {}).get("rendered", title),
         }
     except Exception as e:
-        log.error(f"WordPress 발행 실패: {e}")
-        return {"status": "failed", "error": str(e)}
+        log.error(f"WordPress 저장 실패: {e}")
+        return {"status": "failed", "title": title, "error": str(e)}
 
 
 # ═══════════════════════════════════════════════════════
@@ -796,13 +823,15 @@ def publish_to_wordpress(title: str, content: str, category: str = "재테크 & 
 # ═══════════════════════════════════════════════════════
 
 def log_to_supabase(result: dict, model_used: str, report_type: str,
-                    content_length: int = 0, quality_score: float = 0):
-    """발행 결과를 Supabase에 기록 (실제 메트릭 포함)"""
+                    content_length: int = 0, quality_score: float = 0, site_id: str = ""):
+    """저장 결과를 Supabase에 기록 (실제 메트릭 포함). 초안·실패는 published_at을 비운다."""
     if not SUPABASE_URL or not SUPABASE_KEY:
         return
 
     import requests
 
+    status = result.get("status", "unknown")
+    now = datetime.now(KST).isoformat()
     try:
         requests.post(
             f"{SUPABASE_URL}/rest/v1/publish_logs",
@@ -813,16 +842,18 @@ def log_to_supabase(result: dict, model_used: str, report_type: str,
                 "Prefer": "return=minimal",
             },
             json={
-                "site_id": SITE_ID,
+                "site_id": site_id or SITE_ID,
                 "title": result.get("title", ""),
                 "url": result.get("url", ""),
                 "keyword": f"etf-report-{report_type}",
                 "pipeline": "etf-report",
-                "status": result.get("status", "unknown"),
+                "status": status,
+                "error_message": result.get("error", ""),
                 "quality_score": quality_score,
                 "content_length": content_length,
                 "has_image": False,
-                "created_at": datetime.now(KST).isoformat(),
+                "created_at": now,
+                "published_at": now if status == "published" else None,
             },
             timeout=10,
         )
@@ -963,13 +994,56 @@ def is_korean_market_open(today=None) -> bool:
     return True
 
 
+def _get_site_status(site_id: str) -> str:
+    """Supabase sites.status 조회. 설정이 없거나 조회에 실패하면 '' (main.py run_pipeline과 같은 기준)."""
+    if not SUPABASE_URL or not SUPABASE_KEY or not site_id:
+        return ""
+    import requests
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/sites?id=eq.{site_id}&select=status",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+            timeout=10,
+        )
+        rows = resp.json()
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+            return rows[0].get("status") or ""
+    except Exception as e:
+        log.warning(f"사이트 상태 조회 실패 (계속 진행): {e}")
+    return ""
+
+
 def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False,
-                   force: bool = False):
-    """ETF 리포트 파이프라인 실행"""
+                   force: bool = False, site_id: str = "") -> str:
+    """ETF 리포트 파이프라인 실행.
+
+    반환: 'refused'(발행 대상 가드 — CLI는 exit 1) | 'skipped' | 'dry_run' | 'draft' | 'published' | 'failed'
+    기본은 WordPress 초안. EDITORIAL_REVIEW_REQUIRED가 정확히 'false'일 때만 공개하고 SNS에 알린다.
+    """
+    sid = site_id or SITE_ID
+
+    # ── 발행 대상 가드: ETF API·유료 AI 호출 전에 확인한다.
+    if sid != ETF_SITE_ID:
+        log.error(f"ETF 리포트는 {ETF_SITE_ID}({OWNED_SITES[ETF_SITE_ID]}) 전용입니다. "
+                  f"요청된 사이트: '{sid or '없음'}' — 중단")
+        return "refused"
+    # 드라이런은 WordPress에 쓰지 않으므로 WP_URL이 비어 있어도 된다. 값이 있으면 드라이런도 검사한다.
+    if (WP_URL or not dry_run) and not wp_url_allowed(sid, WP_URL):
+        log.error(f"[{sid}] WP 주소 호스트 '{wp_host(WP_URL) or '없음'}'가 "
+                  f"허용 도메인 '{OWNED_SITES[sid]}'와 다릅니다 — 중단")
+        return "refused"
+    if _get_site_status(sid) == "paused":
+        log.info(f"[{sid}] 일시정지 상태 — 스킵")
+        return "skipped"
+
+    # 편집 검토 큐 (main.py와 같은 fail-closed 기준): 설정이 없거나 'false'가 아니면 초안으로만 저장.
+    wp_status = "draft" if editorial_review_required() else "publish"
+
     log.info("=" * 60)
     log.info(f"ETF Report Pipeline — {report_type} (퀀트 전략)")
     log.info(f"  API: {ETF_API_URL}")
-    log.info(f"  WP: {WP_URL}")
+    log.info(f"  WP: {WP_URL} [{sid}]")
+    log.info(f"  저장 방식: {'초안만 (편집 검토 후 WordPress에서 공개)' if wp_status == 'draft' else '공개 + SNS 알림'}")
     log.info(f"  Dry Run: {dry_run}")
     log.info("=" * 60)
 
@@ -977,13 +1051,13 @@ def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False,
     if not force and not dry_run:
         if not is_korean_market_open():
             log.info("한국 주식시장 휴장일 — 파이프라인 종료")
-            return
+            return "skipped"
 
     # Step 1: ETF Dashboard에서 리포트 fetch
     report = fetch_etf_report(report_type)
     if not report:
         log.error("리포트 데이터 없음 — 종료")
-        return
+        return "failed"
 
     # blog-ready가 아닌 경우 daily를 기본으로 래핑
     if report_type != "blog-ready" and "daily" not in report:
@@ -993,14 +1067,14 @@ def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False,
     daily = report.get("daily", {})
     if not daily.get("sector_rankings") and not daily.get("leading_sectors"):
         log.error("ETF API 응답에 섹터 데이터 없음 — 발행 중단")
-        return
+        return "failed"
 
     # Step 2: AI 프롬프트 생성 + 글 생성
     prompt = build_etf_blog_prompt(report)
     content, model_used = generate_blog_content(prompt)
     if not content:
         log.error("AI 글 생성 실패 — 종료")
-        return
+        return "failed"
 
     # Step 2.5: 차트 + 신호 뱃지 삽입
     daily_data = report.get("daily", {})
@@ -1141,19 +1215,19 @@ def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False,
 
     if quality_score < 50:
         log.warning(f"품질 극히 미달 ({quality_score}/100) — 발행 중단")
-        return
+        return "failed"
 
-    # Step 4: 발행
+    # Step 4: 저장 (기본 초안)
     if dry_run:
-        log.info("[DRY RUN] 발행 스킵")
+        log.info("[DRY RUN] 저장 스킵")
         log.info(f"제목: {title}")
         log.info(f"품질: {quality_score}/100, 길이: {content_length}자")
         log.info(f"본문 미리보기:\n{content[:500]}...")
-        return
+        return "dry_run"
 
     if not WP_URL or not WP_USER or not WP_PASS:
         log.error("WordPress 인증 정보 없음 (WP_URL, WP_USERNAME, WP_APP_PASSWORD)")
-        return
+        return "failed"
 
     leading_sectors = daily_data.get("leading_sectors", [])
     payload = _extract_payload(report)
@@ -1161,23 +1235,25 @@ def run_etf_report(report_type: str = "blog-ready", dry_run: bool = False,
         title, content,
         category="재테크 & 투자",       # planx-ai.com 메인 투자 카테고리 (slug: finance-invest)
         leading_sectors=leading_sectors,
-        target_stock=payload.get("target_stock", "")
+        target_stock=payload.get("target_stock", ""),
+        status=wp_status,
     )
+    log_to_supabase(result, model_used, report_type,
+                    content_length=content_length, quality_score=quality_score, site_id=sid)
 
     if result["status"] == "published":
         log.info(f"발행 성공: {result.get('url', '')}")
-        log_to_supabase(result, model_used, report_type,
-                        content_length=content_length, quality_score=quality_score)
-        # SNS 알림
+        # SNS 알림은 실제로 공개된 글만. 초안 링크는 방문자에게 404다.
         notify_sns(title, result.get("url", ""), quality_score)
+    elif result["status"] == "draft":
+        log.info(f"초안 저장 (편집자가 WordPress에서 확인 후 공개, SNS 알림 없음): {result.get('url', '')}")
     else:
-        log.error(f"발행 실패: {result.get('error', '')}")
-        log_to_supabase(result, model_used, report_type,
-                        content_length=content_length, quality_score=quality_score)
+        log.error(f"저장 실패: {result.get('error', '')}")
 
     log.info("=" * 60)
     log.info("ETF Report Pipeline 완료")
     log.info("=" * 60)
+    return result["status"]
 
 
 # ═══════════════════════════════════════════════════════
@@ -1201,7 +1277,9 @@ def main():
         global ETF_API_URL
         ETF_API_URL = args.etf_api_url
 
-    run_etf_report(report_type=args.report_type, dry_run=args.dry_run, force=args.force)
+    result = run_etf_report(report_type=args.report_type, dry_run=args.dry_run, force=args.force)
+    if result == "refused":
+        sys.exit(1)
 
 
 if __name__ == "__main__":

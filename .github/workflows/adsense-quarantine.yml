@@ -1,0 +1,39 @@
+name: AdSense keep five reviewed posts
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Set true to keep only the five reviewed posts public"
+        required: true
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+jobs:
+  quarantine:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Run quarantine
+        env:
+          WP_URL: ${{ secrets.WP_URL }}
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+        run: >-
+          python scripts/quarantine_adsense_posts.py
+          ${{ inputs.apply == 'true' && '--apply' || '' }}
+      - name: Preserve rollback backup
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: adsense-quarantine-backup
+          path: adsense-quarantine-backup.json
+          if-no-files-found: error
+          retention-days: 30

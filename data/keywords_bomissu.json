@@ -130,33 +130,6 @@
       "focus_keyword": "양도소득세 계산법"
     },
     {
-      "keyword": "직장인 부업 추천 2026 현실 수익 공개",
-      "type": "traffic",
-      "intent": "informational",
-      "category": "부업·수익화",
-      "pipeline": "autoblog",
-      "slug": "employee-side-job-2026",
-      "focus_keyword": "직장인 부업 추천 2026"
-    },
-    {
-      "keyword": "블로그 수익화 초보 가이드 월 100만원",
-      "type": "traffic",
-      "intent": "informational",
-      "category": "부업·수익화",
-      "pipeline": "autoblog",
-      "slug": "blog-monetization-beginner",
-      "focus_keyword": "블로그 수익화 초보"
-    },
-    {
-      "keyword": "쿠팡 파트너스 수익 인증 현실 후기",
-      "type": "traffic",
-      "intent": "informational",
-      "category": "부업·수익화",
-      "pipeline": "autoblog",
-      "slug": "coupang-partners-real-review",
-      "focus_keyword": "쿠팡 파트너스 수익"
-    },
-    {
       "keyword": "재능 판매 플랫폼 비교 크몽 숨고 탈잉",
       "type": "traffic",
       "intent": "informational",
@@ -173,15 +146,6 @@
       "pipeline": "autoblog",
       "slug": "housewife-side-job-2026",
       "focus_keyword": "주부 부업 추천"
-    },
-    {
-      "keyword": "프리랜서 월 500만원 수입 만드는 로드맵",
-      "type": "traffic",
-      "intent": "informational",
-      "category": "부업·수익화",
-      "pipeline": "autoblog",
-      "slug": "freelancer-5m-roadmap",
-      "focus_keyword": "프리랜서 수입 로드맵"
     },
     {
       "keyword": "실비보험 가입 비교 2026 연령별 추천",
@@ -472,24 +436,6 @@
       "focus_keyword": "유튜브 수익화 조건 2026"
     },
     {
-      "keyword": "스마트스토어 창업 현실 수익 후기 2026",
-      "type": "traffic",
-      "intent": "informational",
-      "category": "부업·수익화",
-      "pipeline": "autoblog",
-      "slug": "smartstore-startup-review-2026",
-      "focus_keyword": "스마트스토어 창업 현실"
-    },
-    {
-      "keyword": "전자책 출판 부업 월 수익 50만원 만들기",
-      "type": "traffic",
-      "intent": "informational",
-      "category": "부업·수익화",
-      "pipeline": "autoblog",
-      "slug": "ebook-publishing-side-income",
-      "focus_keyword": "전자책 출판 부업"
-    },
-    {
       "keyword": "배달 라이더 부업 시급 현실 2026",
       "type": "traffic",
       "intent": "informational",
@@ -497,15 +443,6 @@
       "pipeline": "autoblog",
       "slug": "delivery-rider-side-job-2026",
       "focus_keyword": "배달 라이더 부업 시급"
-    },
-    {
-      "keyword": "인스타그램 수익화 방법 팔로워 1000명부터",
-      "type": "traffic",
-      "intent": "informational",
-      "category": "부업·수익화",
-      "pipeline": "autoblog",
-      "slug": "instagram-monetization-1k-followers",
-      "focus_keyword": "인스타그램 수익화 방법"
     },
     {
       "keyword": "크몽 부업 초보 가이드 인기 서비스 TOP 5",

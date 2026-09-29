@@ -132,21 +132,3 @@ export function ActionButton({ children, onClick, variant, style: extraStyle, di
     }}>{children}</button>
   );
 }
-
-export function PlanLock({ planRequired, children }) {
-  return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ opacity: 0.4, pointerEvents: 'none', filter: 'blur(1px)' }}>{children}</div>
-      <div style={{
-        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(255,255,255,0.7)', borderRadius: 16, backdropFilter: 'blur(2px)'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>&#x1f512;</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{planRequired}에서 사용 가능</div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>업그레이드하여 잠금 해제</div>
-        </div>
-      </div>
-    </div>
-  );
-}

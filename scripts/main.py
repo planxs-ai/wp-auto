@@ -39,7 +39,16 @@ GROK_KEY = os.environ.get("GROK_API_KEY", "")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-SITE_ID = os.environ.get("SITE_ID", "site-1")
+# 기본값 없음: 레거시(환경변수) 모드는 SITE_ID를 명시해야 한다. 'site-1' 기본값은 fork가 SITE_ID 없이
+# WP_URL만 바꿔 돌려도 검사를 통과시키던 구멍이었다 (2026-09-14).
+SITE_ID = os.environ.get("SITE_ID", "")
+
+# 이 저장소가 발행할 수 있는 사이트는 두 곳뿐이다 (2026-09-13 결정: 지인 사이트 자동화 종료).
+# planx-ai.com = site-1, bomissu.com = site-1775046458524. ID와 WP 호스트를 함께 묶는다 (site_guard.py).
+try:
+    from .site_guard import OWNED_SITES, OWNED_SITE_IDS, wp_host, wp_url_allowed, editorial_review_required
+except ImportError:
+    from site_guard import OWNED_SITES, OWNED_SITE_IDS, wp_host, wp_url_allowed, editorial_review_required
 
 # 네이버 카페 API
 NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID", "")
@@ -59,8 +68,13 @@ class KeywordManager:
         # 사이트별 키워드 파일: keywords_{domain}.json → keywords.json 폴백
         self.kw_file = self._resolve_kw_file(site_id)
         self.used_file = DATA / "used_keywords.json"
+        # 카니발라이제이션 등으로 건너뛴 키워드. 다시 고르지 않고 편집자가 검토한다.
+        self.quarantine_file = DATA / "quarantined_keywords.json"
         self.keywords = self._load(self.kw_file, {"keywords": []})
         self.used = self._load(self.used_file, [])
+        self.quarantined = self._load(self.quarantine_file, [])
+        if not isinstance(self.quarantined, list):
+            self.quarantined = []
         log.info(f"  키워드 파일: {self.kw_file.name} ({len(self.keywords.get('keywords', []))}개)")
 
     def _resolve_kw_file(self, site_id):
@@ -89,41 +103,23 @@ class KeywordManager:
             json.dump(self.used, f, ensure_ascii=False, indent=2)
 
     def select(self, count=5, pipeline="autoblog", niche="", kw_mix=None):
-        """미사용 키워드 중 count개 선택. 소진 시: AI 동적 생성 → 재활용 순서로 폴백."""
+        """미사용·미격리 키워드 중 count개 선택.
+
+        소진된 키워드는 자동 재활용하지 않는다(같은 주제 중복 발행 방지). 기존 글 갱신은 편집자가 판단한다.
+        부족분 보충은 run_pipeline의 동적 키워드 폴백이 맡는다.
+        """
         pool = self.keywords.get("keywords", [])
+        quarantined = self._quarantined_keywords()
         available = [
             kw for kw in pool
             if kw.get("keyword") not in self.used
+            and kw.get("keyword") not in quarantined
             and kw.get("pipeline", "autoblog") == pipeline
             and (not niche or kw.get("category", "") == niche)
         ]
 
         if niche:
             log.info(f"  니치 필터: '{niche}' -> {len(available)}개 키워드")
-
-        # 키워드 부족 시: 1차 AI 동적 생성 시도, 2차 재활용
-        if len(available) < count:
-            # 1차: AI 동적 키워드 생성 (니치 지정 시)
-            need = count - len(available)
-            ai_niche = niche if niche else None
-            if ai_niche:
-                ai_keywords = self._generate_for_niche(ai_niche, need)
-                if ai_keywords:
-                    log.info(f"🤖 AI 동적 키워드 {len(ai_keywords)}개 생성 ({ai_niche})")
-                    available.extend(ai_keywords)
-
-            # 2차: 그래도 부족하면 used 초기화 후 재활용
-            if len(available) < count and len(pool) > 0:
-                pipeline_pool = [kw for kw in pool
-                                if kw.get("pipeline", "autoblog") == pipeline
-                                and (not niche or kw.get("category", "") == niche)]
-                if pipeline_pool:
-                    log.info(f"♻️ 키워드 재활용 (재사용 {len(pipeline_pool)}개)")
-                    recycle_kws = {kw.get("keyword") for kw in pipeline_pool}
-                    self.used = [u for u in self.used if u not in recycle_kws]
-                    self._save_used()
-                    recycled = [kw for kw in pipeline_pool if kw not in available]
-                    available.extend(recycled)
 
         if len(available) < count:
             log.warning(f"가용 키워드 {len(available)}개 (요청 {count}개)")
@@ -159,6 +155,23 @@ class KeywordManager:
         if keyword not in self.used:
             self.used.append(keyword)
             self._save_used()
+
+    def _quarantined_keywords(self):
+        return {q.get("keyword") for q in self.quarantined if isinstance(q, dict)}
+
+    def quarantine(self, keyword, reason, detail=""):
+        """다시 고르지 않을 키워드를 격리 목록에 기록한다 (재사용 금지, 편집자 검토용)."""
+        if keyword in self._quarantined_keywords():
+            return
+        self.quarantined.append({
+            "keyword": keyword,
+            "reason": reason,
+            "detail": detail,
+            "site_id": SITE_ID,
+            "at": datetime.now(KST).isoformat(timespec="seconds"),
+        })
+        with open(self.quarantine_file, "w", encoding="utf-8") as f:
+            json.dump(self.quarantined, f, ensure_ascii=False, indent=2)
 
     # ── 카니발라이제이션 검사 ──
     def check_cannibalization(self, keyword, threshold=0.6):
@@ -198,7 +211,8 @@ CONTENT_ANGLES = [
 
 # 키워드 자동 보충용 기본 니치 (대시보드 미설정 시 폴백)
 DEFAULT_FALLBACK_NICHES = [
-    "AI 활용 & 생산성", "재테크 & 투자", "부업 & 수익화",
+    # '부업 & 수익화'는 제외 (2026-09-13: 쿠팡파트너스·애드센스·블로그수익화 계열이 절단 사고와 니치 이탈을 만듦)
+    "AI 활용 & 생산성", "재테크 & 투자",
     "정부지원 & 보조금", "세무 & 절세", "여행 & 라이프",
     "건강 & 웰니스", "뷰티 & 패션", "생활가전 & 스마트홈",
     "교육 & 자기계발", "행사 & 트렌드", "비교 & 리뷰",
@@ -277,8 +291,8 @@ NICHE_STYLES = {
     "product": {
         "label": "제품 리뷰/비교",
         "tone": (
-            "직접 써본 사람의 생생한 경험담 톤. "
-            "'실제로 2주간 사용해보니' 같은 체험 기반 서술. "
+            "공개 자료의 비교 근거를 차분하게 설명하는 톤. "
+            "제공된 실사용 기록이 없으면 체험을 주장하지 않는다. "
             "스펙 나열보다 '그래서 내 생활이 어떻게 바뀌었는지'에 집중."
         ),
         "value_focus": "돈 아끼기(가성비/최저가) + 시간 절약(비교 대신 해줌) + 남들이 모르는 숨은 기능",
@@ -338,7 +352,7 @@ NICHE_STYLES = {
         "value_focus": "돈 아끼기(지원금/혜택) + 노력 절감(복잡한 절차 간소화) + 남들이 모르는 숨은 혜택",
         "must_blocks": (
             "- <table>: 자격 요건/지원 금액/신청 기간 정리표 (돈 아끼는 정보 한눈에)\n"
-            "- <div class=\"tip-box\">: '90%가 놓치는 추가 혜택/서류' (남들이 모르는 것)\n"
+            "- <div class=\"tip-box\">: '자주 놓치는 추가 혜택/서류' (남들이 모르는 것)\n"
             "- <div class=\"key-point\">: '나도 대상자? 3가지만 확인하세요' (노력 절감)\n"
             "- <blockquote>: '이것 때문에 탈락하는 사람이 많습니다' (시간+돈 절약)"
         ),
@@ -349,13 +363,13 @@ NICHE_STYLES = {
     "promo": {
         "label": "홍보/마케팅",
         "tone": (
-            "브랜드 스토리텔러 톤. '문제 상황 → 해결 과정 → 변화된 결과' 내러티브. "
-            "감성적 공감과 사회적 증거(후기, 수치) 조화. "
+            "브랜드 스토리텔러 톤. '문제 상황 → 해결 과정 → 달라지는 점' 내러티브. "
+            "후기·수치 같은 사회적 증거는 제공된 자료가 있을 때만 쓰고, 없으면 만들지 않는다. "
             "직접적 판매 권유 대신 '왜 이것이 가치 있는지' 설득."
         ),
-        "value_focus": "성과 향상(Before→After 변화) + 시간 절약(직접 찾아보지 않아도 됨) + 돈 아끼기(할인/프로모션)",
+        "value_focus": "성과 향상(달라지는 점) + 시간 절약(직접 찾아보지 않아도 됨) + 돈 아끼기(할인/프로모션)",
         "must_blocks": (
-            "- <blockquote>: 실사용자 Before→After 변화 수치 (성과 향상 증거)\n"
+            "- <blockquote>: 제공된 사례나 출처 있는 자료가 있을 때만 전후 비교 (없으면 이 블록 생략)\n"
             "- <div class=\"tip-box\">: '오늘 시작하는 가장 쉬운 방법' (노력 절감)\n"
             "- <table>: 경쟁 대안 비교표 — 가격/기능/만족도 (돈 아끼는 선택)\n"
             "- <div class=\"key-point\">: '이 글의 핵심: 왜 지금인가' (시간 절약)"
@@ -368,7 +382,7 @@ NICHE_STYLES = {
         "label": "생활경제 라이프스타일",
         "tone": (
             "친한 언니/오빠가 알려주는 톤. 부드럽고 따뜻하지만 정확한 정보. "
-            "'이건 내가 직접 해봤는데' 같은 경험 기반 서술. "
+            "개인 경험은 제공된 기록이 있을 때만 인용한다. "
             "어려운 용어는 쉽게 풀어주고, 실질적으로 돈 아끼는 방법에 집중."
         ),
         "value_focus": "돈 아끼기(지원금/절세/할인) + 노력 절감(복잡한 절차 쉽게) + 시간 절약(핵심만 정리)",
@@ -395,7 +409,8 @@ NICHE_DOMAINS = {
     # === 12개 표준 니치 (워크플로우 드롭다운과 동일) ===
     "AI 활용 & 생산성": ["ChatGPT", "Claude", "Gemini", "Midjourney", "Cursor", "NotebookLM", "Perplexity", "Copilot", "Suno", "Gamma", "Descript", "Runway", "노션", "구글워크스페이스"],
     "재테크 & 투자": ["적금", "ETF", "주식", "대출", "보험", "연금", "절세", "부동산", "배당주", "ISA", "IRP", "비트코인", "금투자"],
-    "부업 & 수익화": ["블로그수익화", "쿠팡파트너스", "스마트스토어", "애드센스", "유튜브", "크몽", "전자책", "디지털노마드", "N잡러", "워드프레스"],
+    # 쿠팡파트너스·애드센스·블로그수익화 계열 제외 (2026-09-13, AdSense 재심사 준비)
+    "부업 & 수익화": ["스마트스토어", "유튜브", "크몽", "전자책", "디지털노마드", "N잡러", "워드프레스"],
     "정부지원 & 보조금": ["정부보조금", "청년정책", "소상공인지원", "창업지원", "고용보험", "육아수당", "주거지원", "실업급여", "국민취업지원", "기초연금", "전기차보조금"],
     "세무 & 절세": ["종합소득세", "부가세", "연말정산", "세금환급", "절세전략", "부양가족공제", "의료비공제", "월세세액공제", "간이과세자", "경비처리"],
     "여행 & 라이프": ["항공권", "호텔", "패키지", "자유여행", "제주도", "일본여행", "전월세", "생활비절약", "호캉스", "캠핑"],
@@ -437,7 +452,7 @@ NICHE_DOMAINS = {
     "tax-saving": ["종합소득세", "부가세", "연말정산", "세금환급", "절세전략", "부양가족공제", "의료비공제", "월세세액공제", "사업소득세", "종소세신고", "세금계산기", "원천징수"],
     "insurance-finance": ["실손보험", "자동차보험", "건강보험", "암보험", "종신보험", "보험비교", "보험리모델링", "대출금리비교", "신용대출", "전세대출", "주택담보대출", "적금추천"],
     "life-economy": ["생활비절약", "교통비할인", "통신비절감", "공과금절약", "카드혜택", "포인트활용", "알뜰소비", "구독절약", "중고거래", "재테크기초", "가계부", "짠테크"],
-    "side-income": ["블로그수익화", "쿠팡파트너스", "스마트스토어", "애드센스", "재능판매", "배달부업", "투잡", "디지털노마드", "N잡러", "크몽프리랜서", "중고거래수익", "부업추천"],
+    "side-income": ["스마트스토어", "재능판매", "배달부업", "투잡", "디지털노마드", "N잡러", "크몽프리랜서", "중고거래수익", "부업추천"],
     "finance-invest": ["적금추천", "예금금리비교", "주식입문", "ETF투자", "연금저축", "IRP", "ISA계좌", "보험비교", "실손보험", "자동차보험", "건강보험", "대출금리"],
     "tax-guide": ["종합소득세", "부가세", "연말정산", "세금환급", "절세전략"],
     "agency": ["고용노동부", "중소벤처기업부", "국세청", "금융위원회"],
@@ -658,7 +673,7 @@ class DynamicKeywordGenerator:
 # ═══════════════════════════════════════════════════════
 
 # ── 한국어 프롬프트 (소비자 중심) ──
-DRAFT_PROMPT_KO = """당신은 이 주제를 직접 경험한 사람이에요. 블로그 방문자가 "이 글 진짜 도움된다"며 즐겨찾기에 저장하는 수준의 글을 써주세요.
+DRAFT_PROMPT_KO = """당신은 자료를 정리하는 편집 보조자입니다. 개인 경험을 지어내지 마세요. 블로그 방문자가 "이 글 진짜 도움된다"며 즐겨찾기에 저장하는 수준의 글을 써주세요.
 
 키워드: {keyword}
 검색의도: {intent}
@@ -722,7 +737,7 @@ DRAFT_PROMPT_KO = """당신은 이 주제를 직접 경험한 사람이에요. �
 - 짧은 문장과 긴 문장을 리듬감 있게 교차 — 셋 중 하나는 질문이나 감탄으로
 
 === E-E-A-T (구글 SEO) ===
-- "직접 해보니", "실제로 써봤는데" 등 1인칭 경험 1~2회
+- 제공된 실사용 기록이 없으면 1인칭 체험담을 쓰지 않는다.
 - 수치/통계에 시점 명시 ("2026년 기준")
 - 공식 기관/사이트명 1개 이상 언급
 
@@ -786,7 +801,7 @@ POLISH_PROMPT_KO = """이 초안을 "친구한테 카톡으로 공유하고 싶�
 """
 
 # ── 영문 프롬프트 (Consumer-first) ──
-DRAFT_PROMPT_EN = """You are a hands-on expert who has personally researched and tested everything in this topic.
+DRAFT_PROMPT_EN = """You are a careful editor who explains public information clearly. Do not claim personal testing.
 Write for a reader who Googled this problem and needs a real, actionable answer.
 
 Keyword: {keyword}
@@ -927,23 +942,18 @@ ADSENSE_DRAFT_PROMPT_KO = """당신은 이 분야의 권위 있는 전문가이�
 - 정치적 편향, 혐오 발언, 차별적 표현
 - **어필리에이트/제휴 프로모션 언어 일체 금지**: "쿠팡 파트너스 승인", "텐핑 CPA", "제휴 수수료", "추천 상품 최저가", "지금 바로 클릭", "한정 수량", "오늘만" 등. 정보성 블로그 톤만 유지.
 - **실제 제휴 링크 도메인 절대 금지**: link.coupang.com, tenping.com, partners.coupang.com, ad.admitad, awin.com, share-asia.com 등
-- **과장 수익 표현 금지**: "~만 원 보장", "~% 수익 확정", "누구나 가능" (대신 "평균 ~만 원 수준", "경우에 따라 ~" 사용)
+- **과장 수익 표현 금지**: "~만 원 보장", "~% 수익 확정", "누구나 가능" (대신 조건과 편차를 설명하고, 출처 없는 평균 금액을 만들지 말 것)
 콘텐츠는 반드시 정보성·교육적·유용한 내용이어야 합니다.
 
 === E-E-A-T 필수 신호 (Google 2026 기준 강화) ===
 Google의 Helpful Content & E-E-A-T 평가를 통과하기 위해 모든 글은 다음 신호를 포함해야 합니다:
 
-1. **Experience (경험)**: 도입부 직후 또는 본문 중간에 "실제 경험 문단" 1개 필수
-   - 형식: <div class="experience-box" style="background:#FFF5E8;border-left:4px solid #D4A853;padding:16px 20px;margin:24px 0;border-radius:8px">
-     <p style="margin:0;font-size:15px;line-height:1.8"><strong style="color:#8B6914">직접 경험:</strong> [구체적 상황·시기·수치 포함 개인 경험 2~3문장]</p>
-     </div>
-   - 예: "직접 경험: 2025년 3월 청년내일채움공제를 신청했을 때, 서류 준비에만 꼬박 2주가 걸렸습니다. 가장 헷갈렸던 건 소득 증빙 서류였는데, 국세청 홈택스에서 바로 발급받으면 되는 걸 몰라서 세무서까지 다녀왔어요."
-   - 1인칭 시점, 구체적 날짜/수치, 실패/시행착오 포함 (진정성)
-   - 절대 "많은 사람들이", "일반적으로" 같은 일반화 금지
+1. **Experience (경험)**: 실사용 기록을 제공받은 경우에만 인용한다.
+   - 기록이 없으면 공개 자료를 해석한 글임을 명확히 하고, 체험담을 만들지 않는다.
+   - 설명을 위한 가정은 "가상 예시"로 표시하고 실제 성과와 구분한다.
 
-2. **Expertise (전문성)**: 본문에 최소 2회
-   - "15년간 이 분야를 연구하면서", "수백 건의 사례를 분석한 결과"
-   - 단, 과장 금지 — 실제 근거 있는 수준만
+2. **Expertise (전문성)**: 판단 기준, 비교 과정, 한계와 재현 절차를 설명한다.
+   - 경력, 자격, 연구 건수, 개인 실적을 만들어내지 않는다.
 
 3. **Authoritativeness (권위)**: 데이터 출처 인용 최소 3곳
    - 정부 공식 사이트 (정부24, 국세청, 한국은행, KOSIS, DART)
@@ -998,19 +1008,19 @@ Category: {category}
 """
 
 # ═══════════════════════════════════════════════════════
-# Golden Mode 전용 프롬프트 — Gemini 피드백 3대 전략 반영
-# 1) 페르소나 주입 (15년차 전문가 Insider)
-# 2) 독점적 프레임워크 네이밍 ([영문3자리] + [법칙/매트릭스/시스템])
-# 3) 데이터 앵커링 (서론 3초 만에 수치 기반 권위 확보)
+# Golden Mode 전용 프롬프트
+# 2026-09-13: 전문가 페르소나·프레임워크 네이밍·수치 앵커링 지시를 걷어냄(수치·경력 날조를 유도함).
+# get_prompts가 붙이는 사실성 원칙(truth_rules)과 모순되는 지시를 여기에 다시 넣지 않는다.
+# tests/test_editorial_readiness.py가 금지 문구를 검사한다.
 # ═══════════════════════════════════════════════════════
 
 # 도입부 패턴 12종 — 매 글마다 랜덤 선택 (패턴 분석 방지)
 GOLDEN_INTRO_HOOKS = [
     # 1. 역설 훅 — 통념 뒤집기
     """도입부 패턴: [역설 훅]
-"대부분의 사람들이 ~라고 믿고 있지만, 실제 데이터는 정반대를 가리킵니다."
-→ 독자가 '상식'이라고 믿던 것을 구체적 수치로 뒤집으며 시작. 충격과 호기심을 동시에 유발.
-첫 문장에서 통념을 제시하고, 두 번째 문장에서 데이터로 즉시 반박하십시오.""",
+"대부분 ~라고 생각하지만, 실제로 따져 보면 조건에 따라 달라집니다."
+→ 독자가 '상식'이라고 믿던 것을 제도·조건·비교 기준으로 다시 짚으며 시작합니다.
+첫 문장에서 통념을 제시하고, 두 번째 문장에서 그 통념이 맞지 않는 조건을 설명하십시오. 수치로 반박할 때는 출처를 밝힐 수 있는 공개 자료만 쓰십시오.""",
 
     # 2. 수치 폭탄 — 검증 가능한 공개 통계
     """도입부 패턴: [수치 폭탄]
@@ -1020,9 +1030,9 @@ GOLDEN_INTRO_HOOKS = [
 
     # 3. 시간 대비 — 과거 vs 현재
     """도입부 패턴: [시간 대비]
-"2년 전만 해도 ~였습니다. 그러나 지금은 완전히 다른 판이 열렸습니다."
-→ 과거와 현재의 극적인 변화를 대비시켜 '지금 알아야 할 이유'를 만듭니다.
-반드시 과거 수치와 현재 수치를 병렬 제시하여 변화의 크기를 체감시키십시오.""",
+"2년 전만 해도 ~였습니다. 그러나 지금은 제도(또는 시장 환경)가 달라졌습니다."
+→ 과거와 현재의 변화를 대비시켜 '지금 알아야 할 이유'를 만듭니다.
+변화는 제도·요건·절차의 차이로 설명하고, 과거·현재 수치는 출처를 밝힐 수 있을 때만 나란히 제시하십시오.""",
 
     # 4. 실패 시나리오 — 손실 회피 심리
     """도입부 패턴: [실패 시나리오]
@@ -1034,53 +1044,53 @@ GOLDEN_INTRO_HOOKS = [
     """도입부 패턴: [질문 연타]
 3개의 연속 질문으로 시작하십시오. 각 질문은 독자의 현재 상황을 정확히 묘사해야 합니다.
 예: "매달 ~만 원을 넣고 있지만 수익률은 제자리입니까? ~를 해봤지만 결과가 없었습니까? 정보는 넘치는데 뭘 해야 할지 더 모르겠습니까?"
-→ 세 번째 질문 직후, "이 3가지 질문에 하나라도 해당된다면, 지금부터 제시하는 시스템이 답입니다."로 전환.""",
+→ 세 번째 질문 직후, "하나라도 해당된다면 아래에 확인 순서와 판단 기준을 정리했습니다."로 전환.""",
 
     # 6. 결론 선행 — 핵심 먼저
     """도입부 패턴: [결론 선행]
-"결론부터 말씀드리겠습니다. ~하는 가장 효과적인 방법은 [프레임워크 이름]입니다."
-→ 바쁜 독자의 시간을 존중하는 전문가적 어프로치. 결론을 먼저 던지고, '왜 이것이 최선인지' 데이터로 증명하는 구조.
-두 번째 문장에서 이 결론을 뒷받침하는 핵심 수치 1개를 즉시 제시하십시오.""",
+"결론부터 말씀드리겠습니다. ~할 때는 먼저 [확인할 조건]부터 보는 것이 좋습니다."
+→ 바쁜 독자의 시간을 존중하는 구조. 결론을 먼저 던지고, '왜 그런지' 비교 기준과 근거로 설명합니다.
+두 번째 문장에서 그 결론이 맞는 조건과 맞지 않는 조건을 함께 밝히십시오.""",
 
     # 7. 뉴스/트렌드 앵커 — 최신 사건 연결
     """도입부 패턴: [뉴스 앵커]
-"2026년 ~월, [관련 기관/시장]에서 ~가 발표되었습니다. 이 변화가 의미하는 것은 단 하나입니다."
-→ 최신 트렌드/정책/시장 변화를 앵커로 삼아 글의 시의성을 확보합니다.
-뉴스 팩트 → 독자에게 미치는 영향 → 이 글에서 제시할 해법, 3단계로 전개.""",
+"최근 [관련 기관]이 ~를 발표(또는 개정)했습니다. 이 변화가 독자에게 뜻하는 것은 ~입니다."
+→ 실제로 확인할 수 있는 발표·개정만 앵커로 씁니다. 날짜·기관명·발표 내용을 지어내지 말고, 확실하지 않으면 이 패턴 대신 결론부터 말하는 도입으로 시작하십시오.
+발표 내용 → 독자에게 미치는 영향 → 이 글에서 정리할 확인 절차, 3단계로 전개.""",
 
     # 8. 비유 도입 — 복잡한 개념을 일상으로
     """도입부 패턴: [비유 도입]
 일상의 비유로 시작하되, 즉시 전문적 분석으로 전환하십시오.
 예: "~는 마치 [일상 비유]와 같습니다. 그러나 대부분은 [비유의 핵심 원리]를 무시한 채 ~하고 있습니다."
-→ 비유는 1~2문장으로 끝내고, 세 번째 문장부터 데이터와 수치로 전문가 모드 진입.""",
+→ 비유는 1~2문장으로 끝내고, 세 번째 문장부터 조건·기준·절차 설명으로 넘어가십시오.""",
 
     # 9. 경고문 — 긴급성 부여
     """도입부 패턴: [경고문]
-"지금 ~하고 계시다면, 즉시 멈추십시오."
-→ 강한 경고로 시작하여 주의를 집중시킵니다. 두 번째 문장에서 '왜 멈춰야 하는지' 데이터로 근거 제시.
-세 번째 문장에서 "대신 ~하는 것이 [수치]% 더 효과적입니다"로 대안 제시.""",
+"지금 ~하고 계시다면, 한 가지만 먼저 확인해 보십시오."
+→ 흔한 실수를 짚으며 주의를 모읍니다. 두 번째 문장에서 '왜 확인해야 하는지' 제도·조건으로 설명합니다.
+세 번째 문장에서 대안이나 확인 방법을 제시하십시오. 효과를 비율로 단정하지 마십시오.""",
 
-    # 10. 격차 제시 — 상위 vs 하위
-    """도입부 패턴: [격차 제시]
-"상위 5%는 ~하고, 나머지 95%는 ~합니다. 이 차이를 만드는 것은 단 하나의 시스템입니다."
-→ 엘리트와 대중의 격차를 수치로 보여주어 '나도 상위로 가고 싶다'는 욕구를 자극합니다.
-반드시 구체적 수치로 격차를 제시하고, 그 격차의 원인이 이 글의 주제임을 명시.""",
+    # 10. 선택 기준 — 결과가 갈리는 조건
+    """도입부 패턴: [선택 기준]
+"같은 제도(상품)를 두고도 사람마다 결과가 다른 이유는 확인하는 순서가 다르기 때문입니다."
+→ 결과가 갈리는 조건을 보여주어 '나는 어느 쪽인지' 확인하고 싶게 만듭니다.
+조건 차이는 요건·비용·기간처럼 확인 가능한 항목으로 제시하고, 집단 비율을 만들어 쓰지 마십시오.""",
 
     # 11. 비용 계산 — 기회비용 환산
     """도입부 패턴: [비용 계산]
-"~를 모르고 지나치면, 연간 약 ~만 원의 기회비용이 발생합니다."
-→ 독자가 '안 읽으면 손해'라는 확신을 갖게 만듭니다. 기회비용을 연/월/일 단위로 환산하여 체감시키십시오.
-두 번째 문장에서 "반대로, 이 시스템을 적용하면 ~의 효과를 기대할 수 있습니다"로 긍정 전환.""",
+"~를 모르고 지나치면, 받을 수 있는 혜택이나 아낄 수 있는 비용을 놓치기 쉽습니다."
+→ 독자가 직접 확인해 볼 이유를 느끼게 합니다. 금액은 독자가 자기 숫자를 넣어 볼 수 있는 계산식으로 보여 주고, 결과 금액을 단정하지 마십시오.
+예시 숫자를 쓰면 "가상 예시"라고 밝히십시오.""",
 
     # 12. 체크리스트 진단 — 자가 테스트
     """도입부 패턴: [체크리스트 진단]
 "아래 3가지 중 2개 이상 해당된다면, 이 글은 반드시 읽어야 합니다."
 → 짧은 자가 진단 체크리스트(3~4항목)를 제시합니다. 독자가 자신의 상태를 점검하며 몰입합니다.
-체크리스트 직후 "해당 항목이 많을수록, 지금부터 제시하는 [프레임워크]의 효과는 극대화됩니다."로 연결.""",
+체크리스트 직후 "해당 항목이 많을수록 아래 확인 순서가 도움이 됩니다."로 연결.""",
 ]
 
 GOLDEN_DRAFT_PROMPT_KO = """# Role (역할)
-당신은 상위 1%의 정보력과 냉철한 분석력을 갖춘 15년 차 산업/금융/비즈니스 전문가입니다.
+당신은 공개 자료를 비교하고 불확실성을 구분하는 편집 보조자입니다. 경력이나 자격을 만들어내지 마세요.
 당신의 목표는 레드오션에 널린 뻔한 정보가 아닌, 독자가 당장 실행할 수 있는 '시스템적 해결책'과 '압도적인 인사이트'를 제공하는 블로그 포스팅을 작성하는 것입니다.
 
 # Core Topic
@@ -1090,14 +1100,14 @@ GOLDEN_DRAFT_PROMPT_KO = """# Role (역할)
 
 # Constraint (작성 제약 조건 — 반드시 준수)
 1. '제 지인', '제가 해봤는데' 같은 가벼운 경험담이나 감성적인 위로는 절대 배제할 것.
-2. 대신, 논리적이고 객관적인 데이터(수치, 확률, 통계, 비교표)를 활용하여 모든 주장을 뒷받침할 것.
+2. 대신, 비교표·판단 기준·확인 절차로 주장을 뒷받침할 것. 수치·확률·통계는 제공된 자료나 출처를 밝힐 수 있는 공개 자료가 있을 때만 쓰고, 없으면 쓰지 말 것.
 3. **프레임워크 네이밍은 선택 사항 (남용 금지)**: 주제상 자연스러울 때만 핵심 솔루션에 직관적 이름을 붙일 것.
    - 모든 글에 억지 영문 3자리 약자(C.O.R.E, S.A.V.E, T.A.P 등)를 기계적으로 넣지 말 것 — 동일 패턴 반복은 '대량 생성 콘텐츠'로 인식되어 애드센스 심사에 불리함.
    - 이름을 붙이더라도 본문에서 2~3회 이내로만 자연스럽게 언급(5회 이상 반복 금지).
    - 글마다 소제목 구성·전개 순서를 다르게 하여 획일적 템플릿 인상을 피할 것.
 4. **데이터는 출처가 있을 때만 (충격 통계 날조 금지)**: 구체적 수치/통계는 실존하는 공식 출처가 있을 때만 사용할 것.
    - 출처 없이 "실패율 73%", "90%가 놓치는" 같은 자극용 수치를 지어내지 말 것 (할루시네이션 + 애드센스 정책 위반).
-   - 정확한 수치를 모르면 범위형 표현("상당수", "수십조 원 규모")을 쓰거나 생략할 것.
+   - 정확한 수치를 모르면 그 수치를 쓰지 말 것. "상당수" 같은 모호한 규모 표현으로 바꿔 남기지도 말 것.
    - 수치를 인용하면 아래 9-1 규칙에 따라 반드시 공식 출처 링크를 함께 표기할 것.
 5. 문체는 신뢰감 있되 읽기 편한 톤을 사용할 것 (~합니다, ~해요 혼용).
    "~하십시오" 같은 명령형은 최소화. 독자가 전문가의 조언을 편하게 듣는 느낌.
@@ -1108,12 +1118,12 @@ GOLDEN_DRAFT_PROMPT_KO = """# Role (역할)
 8. **할루시네이션 절대 금지 (CRITICAL)**:
    - 존재하지 않는 통계, 연구 결과, 기관명, 보고서를 절대 날조하지 말 것.
    - "~에 따르면", "~연구 결과" 등 인용 시 반드시 실존하는 출처만 사용할 것.
-   - 정확한 출처를 모르면 "일반적으로 알려진 바에 따르면", "업계 전문가들의 분석에 의하면" 형태로 작성.
+   - 정확한 출처를 모르면 해당 주장을 삭제하거나 확인이 필요함을 명시. 모호한 권위 표현으로 대체하지 말 것.
    - 구체적 수치 인용은 API 페이로드로 주입된 데이터 또는 널리 알려진 공개 통계만 허용.
    - 가짜 퍼센트(%), 가짜 금액, 가짜 기관명을 지어내는 것은 사이트 신뢰도를 파괴하는 행위임.
 9. **수치 사용 규칙**:
    - 도입부 수치는 해당 키워드/산업의 공개된 통계만 사용. 억지 도입부 수치는 불필요.
-   - 정확한 수치를 모르면 "수십조 원 규모", "과반수 이상" 등 범위형 표현 사용.
+   - 정확한 수치를 모르면 수치 없이 조건과 절차로 설명.
    - "73%", "130조 원" 등 구체적 수치는 검증 가능한 경우에만 사용.
 9-1. **권위 출처 하이퍼링크 필수 (E-E-A-T)**: 통계·법령·제도·세율 등을 인용할 때는 해당 공식 기관 페이지로 연결되는 <a> 링크를 본문에 최소 1~2개 포함할 것.
    - 실존 공식 도메인만 사용: 통계청(kostat.go.kr), 국세청(nts.go.kr), 금융감독원(fss.or.kr), 정부24(gov.kr), 한국거래소(krx.co.kr), 보건복지부(mohw.go.kr) 등.
@@ -1134,9 +1144,9 @@ GOLDEN_DRAFT_PROMPT_KO = """# Role (역할)
 <div class="key-point"><strong>이 글의 순서</strong><br/>(핵심 소제목 3~4개를 번호 리스트로 정리)</div>
 
 (H2 5~7개를 키워드에 맞게 자유롭게 구성. 아래는 참고용:)
-- 문제 정의 / 핵심 해결책(프레임워크) / 심화 적용 / 리스크 관리 / 실행 로드맵
+- 문제 정의 / 핵심 해결책 / 심화 적용 / 리스크 관리 / 실행 로드맵
 - H2를 가능하면 독자의 질문 형태로 작성 (AI 검색 인용 최적화)
-- 각 섹션에 <strong> 강조, 수치/데이터, 가치 블록을 자연스럽게 배치
+- 각 섹션에 <strong> 강조, 출처가 있는 수치/데이터, 가치 블록을 자연스럽게 배치
 - 비교/정리 <table> 최소 1개, <blockquote>/<tip-box>/<key-point> 각 1개 이상
 
 <div class="faq-section">
@@ -1167,7 +1177,7 @@ GOLDEN_POLISH_PROMPT_KO = """아래 블로그 초안을 '업계 탑 전문가의
 === Golden 폴리싱 규칙 ===
 1. **프레임워크 절제**: 억지 영문 3자리 약자 프레임워크(C.O.R.E, S.A.V.E 등)가 있으면 자연스럽게 1~2회로 줄이고, 없으면 굳이 만들지 말 것.
    - 같은 이름이 5회 이상 반복되면 줄일 것 (동일 패턴 = 대량 생성 콘텐츠 인상, 애드센스 불리).
-2. **출처 없는 수치 제거**: 출처가 불명확한 구체 수치("73%", "90%가 놓치는" 등)는 범위형 표현으로 바꾸거나 삭제. 새 가짜 통계를 추가하지 말 것.
+2. **출처 없는 수치 제거**: 출처가 불명확한 구체 수치("73%", "90%가 놓치는" 등)는 삭제. 모호한 표현으로 바꿔 남기지 말고, 새 통계를 추가하지 말 것.
    - 수치를 유지하려면 공식 기관 출처 링크(<a href="https://...go.kr" rel="noopener nofollow">기관명</a>)를 본문에 1~2개 포함시킬 것.
 3. **톤 밸런스**: 전문적이되 읽기 편하게. "~합니다"와 "~해요"를 7:3 비율로 혼용.
    "~하십시오" 같은 명령형은 최소화. "여러분" → 자연스러운 2인칭 최소화.
@@ -1180,11 +1190,11 @@ GOLDEN_POLISH_PROMPT_KO = """아래 블로그 초안을 '업계 탑 전문가의
 9. **GEO 검증**: TL;DR 박스(<div class="tldr-box">)가 글 최상단에 있는지, FAQ 섹션(<div class="faq-section">)이 있는지, JSON-LD FAQPage Schema가 있는지 확인. 없으면 추가.
 10. <strong> 최소 10개, <table> 1개 이상, key-point/tip-box/blockquote 각 1개 이상
 11. HTML 구조 유지. 마크다운 잔재 발견 시 HTML로 교체.
-12. 분량 5,000~7,000자 유지. 군더더기 삭제, 부족하면 데이터 기반 콘텐츠 보강.
+12. 분량 5,000~7,000자 목표. 군더더기 삭제. 부족해도 근거 없는 내용으로 채우지 말 것.
 13. **할루시네이션 검증 (CRITICAL — 반드시 수행)**:
     - 본문에서 "~에 따르면", "~연구", "~보고서", "~조사" 등 인용 표현을 모두 찾아라.
-    - 해당 출처가 실존하는지 확인 불가하면 → "일반적으로 알려진 바에 따르면"으로 교체하거나 문장 삭제.
-    - 구체적 수치(%, 금액, 건수)가 검증 불가하면 → 범위형 표현("수십%", "상당수")으로 교체.
+    - 해당 출처가 실존하는지 확인 불가하면 → 문장 삭제 또는 확인 필요 표시. 검증된 것처럼 표현하지 말 것.
+    - 구체적 수치(%, 금액, 건수)가 검증 불가하면 → 그 문장을 삭제. 모호한 표현으로 바꿔 남기지 말 것.
     - 존재하지 않는 기관명, 학술지명, 법률명이 있으면 즉시 삭제.
     - Google Helpful Content 기준: 가짜 통계 1개 = 사이트 전체 신뢰도 하락.
 
@@ -1241,7 +1251,14 @@ def get_prompts(lang="ko", adsense_mode=False, category="", golden_mode=False):
         )
         draft_tmpl = draft_tmpl.rstrip() + "\n" + niche_extra
 
-    return draft_tmpl, polish_tmpl
+    truth_rules = """
+=== 사실성 원칙 / Evidence rules (all modes) ===
+Do not invent firsthand use, credentials, statistics, citations or source URLs.
+If supporting evidence was not supplied, omit the claim or mark it as unverified.
+Label hypothetical examples explicitly. Never imply an AI draft was fact-checked.
+개인 경험·성과·경력·출처를 만들지 마세요. 비교 기준과 한계, 확인 절차를 제시하세요.
+"""
+    return draft_tmpl + truth_rules, polish_tmpl + truth_rules
 
 
 class ContentGenerator:
@@ -1489,20 +1506,22 @@ class ContentGenerator:
 # ═══════════════════════════════════════════════════════
 class QualityGate:
     """
-    품질 채점 기준 (100점 만점) — SEO + GEO + 가독성 통합:
+    품질 채점 기준 — SEO + GEO + 가독성 통합.
+    2026-09-13 CTA 5점 항목을 삭제해 항목 합계 만점이 95점이 됐다. 기준점(75/80/85/90)의 의미가
+    바뀌지 않도록 합계를 100점 만점으로 환산해 돌려준다(예전엔 CTA 박스가 늘 붙어 5점이 공짜였다).
     - 콘텐츠 길이: 20점 (5000자+ = 20, 4000+ = 16, 3000+ = 12, 2000+ = 8, 미만 = 4)
     - H2 소제목 수: 15점 (4~8개 = 15, 3/9 = 10, 기타 = 0)
     - 문단 품질: 10점 (평균 80~400자 = 10, 50~500자 = 7, 기타 = 3)
     - 이미지 포함: 10점 (2장+ = 10, 1장 = 7, 없음 = 0)
     - 키워드 SEO: 10점 (H2에 키워드 2개+ = 10, 1개 = 6, 없음 = 0)
     - <strong> 강조: 5점 (5개+ = 5, 3~4개 = 3, 미만 = 0)
-    - CTA 존재: 5점
     - HTML 구조: 5점
     - 비주얼 블록: 10점 (blockquote/tip-box/key-point/table 중 3종+ = 10, 2종 = 7, 1종 = 3)
     - GEO 구조: 10점 (FAQ/JSON-LD/TL;DR 중 2개+ = 10, 1개 = 5, 없음 = 0) — NEW
     """
 
     MIN_SCORE = 85
+    RAW_MAX = 95  # 항목 합계 만점 (CTA 5점 삭제 후)
 
     def score(self, content, keyword, has_image=False):
         total = 0
@@ -1564,12 +1583,7 @@ class QualityGate:
         total += pts
         details['strong'] = f"{strong_count}개 ({pts}/5)"
 
-        # 7. CTA 존재 (5점)
-        cta_patterns = ['확인해', '시작해', '신청', '추천', '클릭', '바로가기', '지금', '놓치지']
-        has_cta = any(p in content for p in cta_patterns)
-        pts = 5 if has_cta else 0
-        total += pts
-        details['cta'] = f"{'있음' if has_cta else '없음'} ({pts}/5)"
+        # 7. (삭제) CTA 점수 — 링크 없는 CTA 박스를 모든 글에 넣게 만든 원인이라 채점하지 않는다 (2026-09-13)
 
         # 8. HTML 구조 (5점)
         has_proper = '<h2' in content and '<p' in content and '</p>' in content
@@ -1601,6 +1615,9 @@ class QualityGate:
         total += pts
         details['geo_structure'] = f"{geo_elements}종 ({pts}/10)"
 
+        # 100점 만점으로 환산 (항목 합계 만점 RAW_MAX점)
+        details['raw_total'] = f"{total}/{self.RAW_MAX}"
+        total = round(total * 100 / self.RAW_MAX)
         return total, details
 
     # ── 신뢰도 검사 (할루시네이션 의심 패턴 감지) ──
@@ -2281,11 +2298,14 @@ class WordPressPublisher:
         return self._site_name_cache
 
     def publish(self, title, content, category="", tags=None,
-                slug="", focus_keyword="", meta_description=""):
+                slug="", focus_keyword="", meta_description="", status="draft"):
+        """글 저장. 기본은 초안(draft). 공개는 호출자가 status='publish'를 명시할 때만."""
         import requests
+        if status not in ("draft", "publish"):
+            raise ValueError("Unsupported WordPress post status")
         cat_id = self._get_or_create_category(category) if category else None
 
-        post_data = {"title": title, "content": content, "status": "publish", "format": "standard"}
+        post_data = {"title": title, "content": content, "status": status, "format": "standard"}
         if cat_id:
             post_data["categories"] = [cat_id]
         if tags:
@@ -2303,8 +2323,7 @@ class WordPressPublisher:
             seo_meta["rank_math_title"] = f"{title}{seo_title_suffix}"
         if meta_description:
             seo_meta["rank_math_description"] = meta_description
-        # SEO robots: index, follow (명시적 설정)
-        seo_meta["rank_math_robots"] = "a]index,a]follow,a]max-snippet:-1,a]max-image-preview:large,a]max-video-preview:-1"
+        # robots 값은 쓰지 않는다: 형식이 잘못된 값('a]index…')을 쓰던 코드를 제거하고 Rank Math 사이트 기본값을 따른다.
         if seo_meta:
             post_data["meta"] = seo_meta
 
@@ -2315,8 +2334,14 @@ class WordPressPublisher:
             )
             resp.raise_for_status()
             data = resp.json()
+            # 요청한 상태로 저장됐는지 확인한다. 다르면 성공으로 치지 않는다(재시도 전 사람이 확인).
+            if data.get("status") != status:
+                log.error(f"WordPress 상태 불일치: 요청 {status}, 응답 {data.get('status')} (post_id={data.get('id')})")
+                return {"status": "failed", "id": data.get("id"),
+                        "error": "WordPress status mismatch; inspect post before retry"}
             return {"id": data["id"], "url": data.get("link", ""),
-                    "title": data.get("title", {}).get("rendered", title), "status": "published"}
+                    "title": data.get("title", {}).get("rendered", title),
+                    "status": "published" if status == "publish" else "draft"}
         except Exception as e:
             log.error(f"발행 실패: {e}")
             return {"status": "failed", "error": str(e)}
@@ -2602,7 +2627,8 @@ class SupabaseLogger:
                 "sns_shared": json.dumps(data.get("sns_shared", [])),
                 "status": data.get("status", "published"),
                 "error_message": data.get("error_message", ""),
-                "published_at": datetime.now(KST).isoformat(),
+                # 초안·실패는 공개된 적이 없으므로 published_at을 비운다.
+                "published_at": datetime.now(KST).isoformat() if data.get("status", "published") == "published" else None,
             }
             requests.post(
                 f"{self.url}/rest/v1/publish_logs", headers=self.headers,
@@ -2956,17 +2982,7 @@ class ContentFormatter:
         'color:#374151;font-size:15.5px;counter-increment:ol-counter"'
     )
 
-    # CTA 박스: 그라디언트 + 아이콘
-    CTA_BOX = (
-        '\n<div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);'
-        'border-radius:16px;padding:28px 32px;margin:40px 0;text-align:center;'
-        'box-shadow:0 8px 32px rgba(99,102,241,0.25)">\n'
-        '<p style="color:#fff;font-size:20px;font-weight:800;margin:0 0 10px">'
-        '\U0001f680 \uc9c0\uae08 \ubc14\ub85c \ud655\uc778\ud574\ubcf4\uc138\uc694</p>\n'
-        '<p style="color:rgba(255,255,255,0.9);margin:0;font-size:15px;line-height:1.6">'
-        '\uc704 \ub0b4\uc6a9\uc744 \ucc38\uace0\ud574\uc11c \ub098\uc5d0\uac8c \ub9de\ub294 \uc120\ud0dd\uc744 \ud574\ubcf4\uc138\uc694</p>\n'
-        '</div>\n'
-    )
+    # (삭제) CTA 박스 — 목적지 없는 템플릿이 모든 글 끝에 반복돼 '쿠키커터' 신호가 됨 (2026-09-13)
 
     # 구분선
     SECTION_DIVIDER = (
@@ -3000,7 +3016,6 @@ class ContentFormatter:
         content = self._style_h3(content)
         content = self._style_p(content)
         content = self._style_strong(content)
-        content = self._ensure_cta(content)
 
         # Phase 3: 정리
         content = self._remove_duplicate_blocks(content)
@@ -3123,18 +3138,6 @@ class ContentFormatter:
 
         # 테이블 헤더
         self.THEAD_STYLE = f'style="background:{gradient}"'
-
-        # CTA 그라디언트
-        self.CTA_BOX = (
-            f'\n<div style="background:{gradient};'
-            f'border-radius:16px;padding:28px 32px;margin:40px 0;text-align:center;'
-            f'box-shadow:0 8px 32px {accent}40">\n'
-            f'<p style="color:#fff;font-size:20px;font-weight:800;margin:0 0 10px">'
-            f'\U0001f680 \uc9c0\uae08 \ubc14\ub85c \ud655\uc778\ud574\ubcf4\uc138\uc694</p>\n'
-            f'<p style="color:rgba(255,255,255,0.9);margin:0;font-size:15px;line-height:1.6">'
-            f'\uc704 \ub0b4\uc6a9\uc744 \ucc38\uace0\ud574\uc11c \ub098\uc5d0\uac8c \ub9de\ub294 \uc120\ud0dd\uc744 \ud574\ubcf4\uc138\uc694</p>\n'
-            f'</div>\n'
-        )
 
         # strong 하이라이트 색상
         self._strong_bg = f"{accent_light}"
@@ -3438,20 +3441,6 @@ class ContentFormatter:
             return f'<strong style="color:#1a1a2e;background:linear-gradient(transparent 55%,{highlight_color} 55%);padding:0 2px">'
         return _re.sub(r'<strong[^>]*>', _replace_strong, content, flags=_re.IGNORECASE)
 
-    def _ensure_cta(self, content):
-        """마무리에 CTA 박스가 없으면 추가"""
-        cta_indicators = ['지금 바로', '시작하세요', '확인해보세요', '신청하세요']
-        has_cta_box = any(
-            ind in content[-500:] for ind in cta_indicators
-        ) and '<div' in content[-800:]
-
-        if has_cta_box:
-            return content
-
-        content = content.rstrip() + self.CTA_BOX
-        log.info("   CTA 박스 추가")
-        return content
-
     def _md_to_html(self, content):
         """마크다운 잔재를 HTML로 변환 (AI가 MD 문법을 섞어 출력할 때)"""
         # 코드 블록 (```...```) → 제거 (블로그에 코드블록 불필요)
@@ -3542,7 +3531,10 @@ class ContentFormatter:
 # ═══════════════════════════════════════════════════════
 # ── AdSense 승인 전 금지 패턴 ──
 
-# Stage 1(AdSense 승인 전)에서 발행되면 안 되는 콘텐츠 패턴
+# Stage 1(AdSense 승인 전)에서 발행되면 안 되는 콘텐츠 패턴.
+# 탐지 전용이다. 탐지되면 본문은 그대로 두고 초안으로만 저장하며 alert를 남긴다.
+# (2026-09-13: 정규식으로 HTML 블록을 지우던 _remove_adsense_violations·ADSENSE_BANNED_BLOCKS 삭제.
+#  DOTALL 비탐욕 패턴이 첫 <div>부터 키워드까지 도입부를 통째로 잘라 13편이 절단됨.)
 ADSENSE_BANNED_PATTERNS = [
     # 제휴/광고 링크 관련
     (r'쿠팡\s*파트너스', 'coupang_partners'),
@@ -3559,15 +3551,6 @@ ADSENSE_BANNED_PATTERNS = [
     (r'(한정\s*수량|오늘만|마감\s*임박)', 'urgency_spam'),
 ]
 
-# 제거 대상 HTML 블록 패턴
-ADSENSE_BANNED_BLOCKS = [
-    r'<div[^>]*>.*?추천\s*상품.*?</div>',
-    r'<div[^>]*>.*?쿠팡\s*파트너스.*?</div>',
-    r'<p[^>]*>.*?이\s*포스팅은.*?수수료.*?</p>',
-    r'<div[^>]*>.*?텐핑.*?자세히\s*보기.*?</div>',
-]
-
-
 def _check_adsense_violations(content, title=""):
     """Stage 1에서 금지 패턴 검출. 위반 목록 반환."""
     import re as _re
@@ -3577,19 +3560,6 @@ def _check_adsense_violations(content, title=""):
         if _re.search(pattern, check_text, _re.IGNORECASE):
             violations.append(tag)
     return violations
-
-
-def _remove_adsense_violations(content):
-    """Stage 1에서 금지 HTML 블록 자동 제거."""
-    import re as _re
-    for block_pattern in ADSENSE_BANNED_BLOCKS:
-        content = _re.sub(block_pattern, '', content, flags=_re.IGNORECASE | _re.DOTALL)
-    # sponsored 링크를 일반 텍스트로 변환
-    content = _re.sub(
-        r'<a[^>]*rel="nofollow\s*sponsored"[^>]*>(.*?)</a>',
-        r'\1', content, flags=_re.IGNORECASE
-    )
-    return content
 
 
 def _sanitize_title(title):
@@ -3649,7 +3619,7 @@ SITE_AUTHORS = {
         "name": "Bomissu 운영자",
         "url": "https://bomissu.com/about-us/",
         "avatar": "https://bomissu.com/wp-content/uploads/2026/04/bomissu-avatar.png",
-        "bio": "재테크·부업·정부지원금 15년 연구 · 정보성 분석 전문",
+        "bio": "생활경제 정보 정리",
         "publisher": "Bomissu",
     },
     "planx-ai.com": {
@@ -3750,7 +3720,7 @@ def _inject_eeat_blocks(content, title, site_config=None, slug="", pub_date=""):
             "<div>"
             f"<div style=\"font-family:Georgia,serif;font-size:17px;font-weight:700;color:#1A1612\">{author['name']}</div>"
             f"<div style=\"font-size:13px;color:#6B5E52;margin-top:4px\">{author['bio']}</div>"
-            "<div style=\"font-size:12px;color:#9E8E7E;margin-top:6px\">모든 수치는 공식 출처를 기반으로 재검증합니다.</div>"
+            "<div style=\"font-size:12px;color:#9E8E7E;margin-top:6px\">정보의 기준일과 원문을 확인해 주세요. 오류 제보는 문의 페이지에서 받습니다.</div>"
             "</div></div>\n"
         )
         content = content.rstrip() + author_box
@@ -3853,26 +3823,6 @@ def _get_dashboard_config(site_id):
     return {}
 
 
-def _get_all_active_sites():
-    """Supabase에서 active 상태인 모든 사이트 조회"""
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        return []
-    import requests
-    try:
-        resp = requests.get(
-            f"{SUPABASE_URL}/rest/v1/sites?status=eq.active&order=created_at",
-            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
-            timeout=10
-        )
-        data = resp.json()
-        if not isinstance(data, list):
-            log.warning(f"sites 테이블 응답이 리스트가 아님: {type(data).__name__}")
-            return []
-        return [s for s in data if isinstance(s, dict)] or []
-    except Exception:
-        return []
-
-
 def should_run_now(site_config=None):
     """사이트별 또는 글로벌 스케줄 설정과 현재 시각 비교. 해당 안 되면 False."""
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -3944,8 +3894,18 @@ def _load_api_keys_from_site(site_config):
 
 
 def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None, adsense_mode=False, golden_mode=False, cli_draft_model="", cli_polish_model="", niches=None):
-    """단일 사이트 파이프라인. site_override가 있으면 해당 사이트 설정 사용."""
+    """단일 사이트 파이프라인. site_override가 있으면 해당 사이트 설정 사용.
+
+    발행 대상 가드에 걸리면 "refused"를 돌려준다(CLI는 exit 1). 그 밖의 종료는 None.
+    """
     global SITE_ID, WP_URL, WP_USER, WP_PASS
+
+    # 사용자 소유 두 사이트 외에는 어떤 경로로 호출돼도 발행하지 않는다.
+    target_site_id = site_override.get("id") if site_override else SITE_ID
+    if target_site_id not in OWNED_SITE_IDS:
+        log.error(f"[{target_site_id or '없음'}] 이 저장소가 발행할 수 없는 사이트입니다. "
+                  f"허용: {', '.join(sorted(OWNED_SITE_IDS))}")
+        return "refused"
 
     # 사이트 설정 로드 (DB 값 → 환경변수 폴백)
     if site_override:
@@ -3961,6 +3921,13 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         site_config = _get_site_config()
         if site_config:
             _load_api_keys_from_site(site_config)
+
+    # ID만으로는 부족하다: 실제로 글을 보낼 WP 주소(DB wp_url → 환경변수 WP_URL 순으로 확정된 값)가
+    # 그 사이트 도메인인지 확인한다. 지인 주소나 다른 소유 사이트 주소로 섞여 들어가면 생성 전에 멈춘다.
+    if not wp_url_allowed(SITE_ID, WP_URL):
+        log.error(f"[{SITE_ID}] WP 주소 호스트 '{wp_host(WP_URL) or '없음'}'가 "
+                  f"허용 도메인 '{OWNED_SITES[SITE_ID]}'와 다릅니다 — 중단")
+        return "refused"
 
     if site_config:
         if site_config.get("status") == "paused":
@@ -3987,14 +3954,20 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
     if adsense_mode:  # CLI --adsense-mode override
         effective_adsense = True
 
-    # 골든타임 모드: Golden 전용 프롬프트 (Gemini 3대 전략) + Claude 폴리싱 + 품질 90+
+    # 편집 검토 큐: 대시보드 Stage와 무관하다. 설정이 없거나 'false'가 아니면 초안으로만 저장(fail-closed).
+    # 사람이 WordPress에서 확인한 뒤 직접 공개한다.
+    editorial_review = editorial_review_required()
+    draft_only = effective_adsense or editorial_review
+
+    # 골든타임 모드: Golden 전용 프롬프트 + Claude 폴리싱 + 품질 90+
     if golden_mode:
         # Golden 프롬프트 사용 (adsense_mode와 독립 — get_prompts에서 golden_mode 우선)
         stage_cfg = {**stage_cfg, "quality_min": 90}
         effective_polish_model = None  # Claude 폴리싱 항상 활성화
-        log.info("  [GOLDEN MODE] 전문가 페르소나 + 프레임워크 네이밍 + 데이터 앵커링")
+        log.info("  [GOLDEN MODE] Golden 프롬프트 + 폴리싱 + 품질 90+ (사실성 원칙 적용)")
 
     log.info(f"  수익화 단계: Stage {monetization_stage} (품질 {stage_cfg['quality_min']}+)")
+    log.info(f"  저장 방식: {'초안만 (편집 검토 후 WordPress에서 공개)' if draft_only else '조건 충족 시 공개'}")
 
     if not WP_URL:
         log.error(f"[{SITE_ID}] WP_URL 없음 — 스킵")
@@ -4079,7 +4052,10 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
     for kw in keywords:
         log.info(f"  [{kw.get('type', 'traffic')}] {kw['keyword']}")
 
-    success = 0
+    success = 0      # 공개
+    drafted = 0      # 초안 저장
+    skipped = 0      # 중복 위험으로 생성하지 않음
+    dry_count = 0    # 드라이런
     fail = 0
 
     for i, kw_data in enumerate(keywords, 1):
@@ -4107,12 +4083,21 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
             top_conflict = cannibal_conflicts[0]
             log.warning(f"  카니발라이제이션 경고: '{top_conflict[0]}' (유사도 {top_conflict[1]})")
             if cannibal_score >= 0.8:
-                log.warning(f"  → 유사도 {cannibal_score} >= 0.8 — 높은 중복 위험")
+                log.warning(f"  → 유사도 {cannibal_score} >= 0.8 — 생성하지 않고 격리")
                 sb.log_alert(
                     f"키워드 중복: {keyword}",
-                    f"기존 '{top_conflict[0]}'과 유사도 {top_conflict[1]}. 카니발라이제이션 위험.",
+                    f"기존 '{top_conflict[0]}'과 유사도 {top_conflict[1]}. 카니발라이제이션 위험. "
+                    f"생성하지 않고 격리했습니다(data/quarantined_keywords.json).",
                     "warning", "cannibal_high"
                 )
+                # 거의 같은 주제에 생성 비용을 쓰지 않는다. 격리해서 다음 실행에서 다시 고르지 않게 한다.
+                if dry_run:
+                    log.info("  [DRY RUN] 격리 기록 생략")
+                else:
+                    km.quarantine(keyword, "cannibal_high",
+                                  f"'{top_conflict[0]}' 유사도 {top_conflict[1]}")
+                skipped += 1
+                continue
 
         # Step 1: AI 글 생성
         content, cost_usd, content_length = cg.generate(
@@ -4198,7 +4183,7 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
                     quality_score = max(quality_score, qs2)
 
         if not passed:
-            log.warning(f"품질 미달 ({quality_score}/{min_score}) — 발행 진행")
+            log.warning(f"품질 미달 ({quality_score}/{min_score}) — 초안으로만 저장")
             sb.log_alert(
                 f"품질 미달: {keyword}",
                 f"점수 {quality_score}/{min_score}. 항목: {json.dumps(q_details, ensure_ascii=False)[:300]}",
@@ -4218,16 +4203,17 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
             )
 
         # Step 6.6: AdSense 승인 전 금지 패턴 체크 (Stage 1에서만)
+        # 탐지만 한다. 본문은 절대 자르지 않는다(과거 정규식 제거가 도입부를 잘라냄). 위반 글은 초안으로만 저장.
+        adsense_violations = []
         if monetization_stage == 1:
             adsense_violations = _check_adsense_violations(content, title)
             if adsense_violations:
                 violation_summary = "; ".join(adsense_violations)
-                log.warning(f"  AdSense 금지 패턴 감지: {violation_summary}")
-                # 금지 패턴 자동 제거
-                content = _remove_adsense_violations(content)
+                log.warning(f"  AdSense 금지 패턴 감지: {violation_summary} — 본문 유지, 초안으로만 저장")
                 sb.log_alert(
-                    f"AdSense 패턴 제거: {keyword}",
-                    f"Stage 1(승인 전)에서 금지 패턴 자동 제거: {violation_summary}",
+                    f"AdSense 금지 패턴 감지: {keyword}",
+                    f"Stage 1(승인 전) 금지 패턴: {violation_summary}. "
+                    f"본문은 수정하지 않았고 초안으로만 저장합니다. 편집자가 확인하세요.",
                     "warning", "adsense_violation"
                 )
 
@@ -4244,11 +4230,37 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         except Exception as _e:
             log.warning(f"E-E-A-T 블록 주입 실패 (무시하고 계속): {_e}")
 
+        # Step 6.9: 중복 목차·같은 이미지 반복 정리 (중립 모듈). 실패하면 원문을 그대로 쓴다.
+        try:
+            try:
+                from .html_cleanup import clean_html
+            except ImportError:
+                from html_cleanup import clean_html
+            content, _cleanup = clean_html(content)
+            if any(_cleanup.values()):
+                log.info(f"  HTML 정리: {_cleanup}")
+        except Exception as _e:
+            log.warning(f"HTML 정리 실패 (원문 유지): {_e}")
+
+        # 점수나 정규식 결과는 사실 확인의 증거가 아니다. 하나라도 걸리면 초안으로만 저장한다.
+        draft_reasons = []
+        if editorial_review:
+            draft_reasons.append("편집 검토 필수")
+        if effective_adsense:
+            draft_reasons.append("AdSense 승인 전 단계")
+        if not passed:
+            draft_reasons.append("품질 미달")
+        if cred_warnings:
+            draft_reasons.append("신뢰도 경고")
+        if adsense_violations:
+            draft_reasons.append("AdSense 금지 패턴")
+        post_status = "draft" if draft_reasons else "publish"
+
         # Step 7: 발행
         if dry_run:
-            log.info(f"[DRY RUN] 발행 스킵: {title} (품질: {quality_score}/100)")
-            km.mark_used(keyword)
-            success += 1
+            # 드라이런은 키워드를 소비하지 않고 WordPress·SNS·색인에 아무것도 보내지 않는다.
+            log.info(f"[DRY RUN] 발행 스킵: {title} (품질: {quality_score}/100, 예정 상태: {post_status})")
+            dry_count += 1
             continue
 
         # SEO: slug와 메타 정보 설정
@@ -4267,9 +4279,26 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         result = wp.publish(title, content, category=category,
                            tags=[keyword, category] if category else [keyword],
                            slug=seo_slug, focus_keyword=seo_focus,
-                           meta_description=seo_meta_desc)
+                           meta_description=seo_meta_desc, status=post_status)
 
-        if result["status"] == "published":
+        if result["status"] == "draft":
+            drafted += 1
+            log.info(f"편집 검토용 초안 저장: post_id={result.get('id')} (품질: {quality_score}/100, "
+                     f"사유: {', '.join(draft_reasons)})")
+            km.mark_used(keyword)
+            sb.log_publish({
+                "title": title, "url": result.get("url", ""),
+                "keyword": keyword, "intent": intent, "category": category,
+                "pipeline": pipeline, "content_length": content_length,
+                "has_image": has_image, "image_source": image_source,
+                "has_coupang": has_coupang,
+                "quality_score": quality_score,
+                "cannibal_score": cannibal_score,
+                "sns_shared": [],
+                "status": "draft",
+            })
+            # 초안 URL은 SNS·IndexNow·사이트맵 핑에 절대 보내지 않는다.
+        elif result["status"] == "published":
             log.info(f"발행 성공: {result.get('url', '')} (품질: {quality_score}/100)")
             km.mark_used(keyword)
             success += 1
@@ -4278,23 +4307,23 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
             if result.get("url"):
                 _submit_indexnow(result["url"])
 
-            # Step 8: SNS 자동 공유 (snsOn 토글 반영)
-            sns_on = site_dashboard_cfg.get("snsOn", {})
+            # Step 8: SNS 자동 공유 (snsOn 토글 반영). 기본은 꺼짐 — 대시보드에서 명시적으로 켠 채널만.
+            sns_on = site_dashboard_cfg.get("snsOn") or {}
             sns_shared = []
             wp_link = result.get("url", "")
 
-            if nc.is_configured() and sns_on.get("naver_cafe", True):
+            if nc.is_configured() and sns_on.get("naver_cafe", False):
                 cafe_url = nc.publish(title, content, wp_url=wp_link)
                 if cafe_url:
                     sns_shared.append("naver_cafe")
 
             tg = TelegramPublisher()
-            if tg.is_configured() and sns_on.get("telegram", True):
+            if tg.is_configured() and sns_on.get("telegram", False):
                 if tg.publish(title, keyword, wp_link):
                     sns_shared.append("telegram")
 
             dc = DiscordPublisher()
-            if dc.is_configured() and sns_on.get("discord", True):
+            if dc.is_configured() and sns_on.get("discord", False):
                 if dc.publish(title, keyword, wp_link):
                     sns_shared.append("discord")
 
@@ -4314,6 +4343,17 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
             error_msg = result.get("error", "Unknown error")
             log.error(f"발행 실패: {error_msg}")
 
+            # 글은 만들어졌는데 상태가 요청과 다르면(예: 초안 요청 → 공개로 저장) 사람이 확인해야 한다.
+            # 다음 실행에서 같은 주제를 또 만들지 않도록 키워드를 격리한다.
+            if result.get("id"):
+                km.quarantine(keyword, "wp_status_mismatch", f"post_id={result.get('id')}, 요청 {post_status}")
+                sb.log_alert(
+                    f"WordPress 상태 불일치: {keyword}",
+                    f"요청 상태 {post_status}와 다르게 저장됨(post_id={result.get('id')}). "
+                    f"WordPress에서 글 상태를 먼저 확인하세요. 키워드는 격리했습니다(data/quarantined_keywords.json).",
+                    "critical", "wp_status_mismatch"
+                )
+
             sb.log_publish({
                 "title": title, "keyword": keyword, "pipeline": pipeline,
                 "quality_score": quality_score,
@@ -4330,14 +4370,17 @@ def run_pipeline(count=5, dry_run=False, pipeline="autoblog", site_override=None
         time.sleep(delay)
 
     log.info(f"\n{'='*60}")
-    log.info(f"실행 결과: 성공 {success}편 / 실패 {fail}편 / 총 {len(keywords)}편")
+    log.info(f"실행 결과: 공개 {success}편 / 초안 {drafted}편 / 건너뜀 {skipped}편 / "
+             f"실패 {fail}편 / 드라이런 {dry_count}편 / 총 {len(keywords)}편")
     log.info(f"{'='*60}")
 
-    # SEO: 발행 완료 후 사이트맵 핑 (Google, Bing, IndexNow)
+    # SEO: 공개 글이 있을 때만 사이트맵 핑 (초안만 저장한 실행에서는 보내지 않음)
     if success > 0 and not dry_run:
         _ping_sitemaps(WP_URL)
 
-    _git_commit_used()
+    # 드라이런은 키워드 상태를 바꾸지 않으므로 커밋할 것도 없다.
+    if not dry_run:
+        _git_commit_used()
 
 
 def _insert_internal_links(content, wp_publisher, current_keyword):
@@ -4485,7 +4528,8 @@ def _git_commit_used():
         import subprocess
         subprocess.run(["git", "config", "user.email", "bot@autoblog.com"], cwd=ROOT, capture_output=True)
         subprocess.run(["git", "config", "user.name", "AutoBlog Bot"], cwd=ROOT, capture_output=True)
-        subprocess.run(["git", "add", "data/used_keywords.json"], cwd=ROOT, capture_output=True)
+        for rel in ("data/used_keywords.json", "data/quarantined_keywords.json"):
+            subprocess.run(["git", "add", rel], cwd=ROOT, capture_output=True)
         result = subprocess.run(
             ["git", "commit", "-m", f"chore: update used keywords {datetime.now(KST).strftime('%Y-%m-%d %H:%M')}"],
             cwd=ROOT, capture_output=True, text=True
@@ -4502,12 +4546,16 @@ def _git_commit_used():
 # CLI
 # ═══════════════════════════════════════════════════════
 def main():
+    global SITE_ID
     parser = argparse.ArgumentParser(description="AutoBlog Engine v6.0")
     parser.add_argument("--count", type=int, default=5, help="발행 편수 (사이트별)")
     parser.add_argument("--dry-run", action="store_true", help="발행 없이 테스트")
-    parser.add_argument("--pipeline", default="autoblog", help="파이프라인 (autoblog/hotdeal/promo)")
+    # hotdeal·promo는 키워드가 0개인 이름뿐인 파이프라인이라 삭제 (2026-09-13)
+    parser.add_argument("--pipeline", default="autoblog", choices=["autoblog", "etf-report"],
+                        help="파이프라인 (autoblog / etf-report)")
     parser.add_argument("--adsense-mode", action="store_true", help="AdSense 승인용 고품질 모드 (85점+, 재생성)")
-    parser.add_argument("--site-id", default="", help="특정 사이트 ID 지정 (기본: SITE_ID 환경변수)")
+    parser.add_argument("--site-id", default="",
+                        help=f"발행 대상 사이트 ID — {', '.join(sorted(OWNED_SITE_IDS))} 중 하나 (그 외는 exit 1)")
     parser.add_argument("--setup-pages", action="store_true", help="AdSense 필수 페이지 자동 생성")
     parser.add_argument("--check-status", action="store_true", help="API 연결 상태 체크 → Supabase 기록")
     parser.add_argument("--site-name", default="", help="사이트 이름 (필수 페이지용)")
@@ -4518,7 +4566,7 @@ def main():
     parser.add_argument("--force", action="store_true", help="스케줄 게이트 무시 (대시보드 수동 실행용)")
     parser.add_argument("--draft-model", default="", help="초안 모델 (grok/gemini) — deepseek는 hex 환각 이슈로 제외")
     parser.add_argument("--polish-model", default="", help="폴리싱 모델 (grok/claude/claude-haiku/gemini/none)")
-    parser.add_argument("--mode", default="", help="실행 모드 (scheduled=전체 활성 사이트 순회)")
+    # --mode scheduled(활성 사이트 전체 순회)는 삭제 — 지인 사이트까지 발행하던 경로 (2026-09-13)
     args = parser.parse_args()
 
     # API 상태 체크 모드
@@ -4531,12 +4579,18 @@ def main():
         if not WP_URL or not WP_USER or not WP_PASS:
             log.error("WP_URL, WP_USERNAME, WP_APP_PASSWORD 환경변수 필요")
             sys.exit(1)
+        # 페이지 생성도 WordPress 쓰기다: 사이트 ID와 WP 호스트가 소유 사이트로 묶여 있을 때만.
+        setup_site = args.site_id or SITE_ID
+        if not wp_url_allowed(setup_site, WP_URL):
+            log.error(f"필수 페이지 생성 거부: 사이트 '{setup_site or '없음'}' / WP 호스트 '{wp_host(WP_URL) or '없음'}'. "
+                      f"허용: " + ", ".join(f"{k}={v}" for k, v in sorted(OWNED_SITES.items())))
+            sys.exit(1)
         epc = EssentialPagesCreator()
         epc.create_all(site_name=args.site_name, email=args.email)
         sys.exit(0)
 
     # AI API 키 체크: --site-id 모드는 Supabase에서 로드 가능하므로 나중에 체크
-    if not args.site_id and not args.mode and not (DEEPSEEK_KEY or GROK_KEY or GEMINI_KEY):
+    if not args.site_id and not (DEEPSEEK_KEY or GROK_KEY or GEMINI_KEY):
         log.error("AI API 키가 하나도 없음 (DEEPSEEK/GROK/GEMINI 중 1개 필요)")
         sys.exit(1)
 
@@ -4545,71 +4599,52 @@ def main():
     if cli_niches:
         log.info(f"니치 설정: {cli_niches}")
 
-    # ETF 리포트 파이프라인 (별도 모듈로 위임)
+    # ── 발행 대상 제한: 사용자 소유 두 사이트만 (코드에 고정, 환경변수로 넓힐 수 없음) ──
+    # ETF 리포트를 포함한 모든 발행 경로보다 먼저 검사한다. --site-id가 없으면 SITE_ID 환경변수(레거시)를 본다.
+    # 둘 다 없으면 기본값으로 채우지 않고 멈춘다. 실제 WP 호스트는 run_pipeline·run_etf_report가 다시 확인한다.
+    target_site = args.site_id or SITE_ID
+    if not target_site:
+        log.error("발행 대상 사이트가 없습니다. --site-id 또는 SITE_ID 환경변수로 "
+                  f"{', '.join(sorted(OWNED_SITE_IDS))} 중 하나를 지정하세요.")
+        sys.exit(1)
+    if target_site not in OWNED_SITE_IDS:
+        log.error(f"사이트 '{target_site}'는 이 저장소에서 발행할 수 없습니다. "
+                  f"허용: {', '.join(sorted(OWNED_SITE_IDS))}")
+        sys.exit(1)
+
+    # ETF 리포트 파이프라인 (별도 모듈로 위임). 초안 기본·paused·site-1 전용·WP 호스트 확인은 모듈이 한다.
     if args.pipeline == "etf-report":
         from etf_report import run_etf_report
-        run_etf_report(report_type="blog-ready", dry_run=args.dry_run)
-        return
-
-    # ── 허용 사이트 화이트리스트 ──
-    # ALLOWED_SITE_IDS 환경변수: 쉼표 구분 (예: "site-1,site-123")
-    # 미설정 시 --site-id로 지정된 단일 사이트만 허용 (scheduled 모드 차단)
-    _allowed_env = os.environ.get("ALLOWED_SITE_IDS", "")
-    ALLOWED_SITE_IDS = {s.strip() for s in _allowed_env.split(",") if s.strip()} if _allowed_env else set()
-
-    if args.mode == "scheduled":
-        if not ALLOWED_SITE_IDS:
-            log.error("ALLOWED_SITE_IDS 환경변수가 설정되지 않아 scheduled 모드를 실행할 수 없습니다.")
+        if run_etf_report(report_type="blog-ready", dry_run=args.dry_run, site_id=target_site) == "refused":
             sys.exit(1)
-        sites = _get_all_active_sites()
-        sites = [s for s in sites if s.get("id") in ALLOWED_SITE_IDS]
-        if not sites:
-            log.warning("허용된 활성 사이트 없음.")
-            sys.exit(0)
-
-        log.info(f"═══ Scheduled Mode: {len(sites)}개 허용 사이트 발행 시작 ═══")
-        for site in sites:
-            site_id = site.get("id", "unknown")
-            domain = site.get("domain", site.get("wp_url", ""))
-            log.info(f"\n▶ [{site_id}] {domain}")
-            try:
-                run_pipeline(
-                    count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
-                    site_override=site, golden_mode=args.golden,
-                    cli_draft_model=args.draft_model, cli_polish_model=args.polish_model,
-                    niches=cli_niches,
-                )
-            except Exception as e:
-                log.error(f"[{site_id}] 파이프라인 실패: {e}")
-        log.info(f"\n═══ Scheduled Mode 완료: {len(sites)}개 사이트 처리 ═══")
         return
 
     # ── 특정 사이트 지정 ──
     if args.site_id:
-        if ALLOWED_SITE_IDS and args.site_id not in ALLOWED_SITE_IDS:
-            log.error(f"사이트 '{args.site_id}'는 이 리포에서 발행이 허용되지 않습니다. 허용: {ALLOWED_SITE_IDS}")
-            sys.exit(1)
-        global SITE_ID
         SITE_ID = args.site_id
         site = _get_site_config(args.site_id)
         if site:
-            run_pipeline(count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
-                         site_override=site, adsense_mode=args.adsense_mode, golden_mode=args.golden,
-                         cli_draft_model=args.draft_model, cli_polish_model=args.polish_model,
-                         niches=cli_niches)
+            result = run_pipeline(count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
+                                  site_override=site, adsense_mode=args.adsense_mode, golden_mode=args.golden,
+                                  cli_draft_model=args.draft_model, cli_polish_model=args.polish_model,
+                                  niches=cli_niches)
+            if result == "refused":
+                sys.exit(1)
         else:
             log.error(f"사이트 '{args.site_id}' 를 찾을 수 없습니다.")
             sys.exit(1)
         return
 
-    # ── 단일 사이트 모드 (환경변수 기반, 레거시 호환) ──
+    # ── 단일 사이트 모드 (환경변수 기반, 레거시 호환 — SITE_ID는 위에서 이미 검사함, WP 호스트는 run_pipeline이 검사) ──
     if not WP_URL:
-        log.error("WP_URL 환경변수 없음. --site-id 또는 --mode scheduled를 사용하세요.")
+        log.error("WP_URL 환경변수 없음. --site-id를 사용하세요.")
         sys.exit(1)
-    run_pipeline(count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
-                 adsense_mode=args.adsense_mode, golden_mode=args.golden,
-                 cli_draft_model=args.draft_model, cli_polish_model=args.polish_model,
-                 niches=cli_niches)
+    result = run_pipeline(count=args.count, dry_run=args.dry_run, pipeline=args.pipeline,
+                          adsense_mode=args.adsense_mode, golden_mode=args.golden,
+                          cli_draft_model=args.draft_model, cli_polish_model=args.polish_model,
+                          niches=cli_niches)
+    if result == "refused":
+        sys.exit(1)
 
 
 if __name__ == "__main__":

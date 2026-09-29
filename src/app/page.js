@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, createContext, useContext } from 'react';
 import { useSites, useTodayStats, useRecentPosts, useMonthlyRevenue, useMonthlyCosts, useAlerts, usePublishTrend, useDashboardConfig, useTotalPublished } from '@/lib/hooks';
 import { supabase, isConfigured } from '@/lib/supabase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
@@ -214,13 +214,13 @@ const ADSENSE_ITEMS = [
 
 const STAGES = [
   { id: 1, label: 'AdSense 승인', color: '#3b82f6', qg: 85,
-    desc: '양질의 콘텐츠로 Google AdSense 승인을 획득합니다. 제휴 링크 없이 순수 정보성 글만 발행합니다.',
+    desc: '심사 준비용 초안을 작성하고 WordPress에서 근거를 확인한 뒤 공개합니다. 승인은 Google 심사로 결정됩니다.',
     features: ['제휴 링크 OFF', '품질 85점+ 게이트', '정보성 키워드 100%', '필수 페이지 체크'],
     kwMix: '정보 100%',
     guide: [
-      { t: 'AdSense 승인 조건', b: '20편 이상의 고유 콘텐츠, 필수 페이지(About/Privacy/Contact/Disclaimer/Terms), HTTPS, 모바일 반응형이 핵심입니다.' },
-      { t: '신청 절차', b: '1) adsense.google.com 접속 → 2) 사이트 URL 입력 → 3) 코드 붙여넣기 → 4) 검토 요청 → 5) 2~14일 대기. 거절 시 콘텐츠 보강 후 재신청 가능합니다.' },
-      { t: '거절 대처법', b: '글 수 부족이 가장 흔한 사유입니다. 30편 이상으로 보강하고 1주 후 재신청하세요. 얇은 콘텐츠(1000자 미만) 삭제도 효과적입니다.' },
+      { t: 'AdSense 승인 조건', b: 'Google은 독창적이고 유용한 콘텐츠와 명확한 탐색 구조를 확인합니다. 개인정보처리방침의 광고 쿠키 안내도 필요합니다. 글 20편과 내부 점수는 자체 점검 기준이며 승인 조건이나 보장이 아닙니다.' },
+      { t: '신청 절차', b: '1) 공개 사이트와 정책 페이지 점검 → 2) AdSense에 사이트 추가 → 3) 계정에 표시된 사이트 연결 절차 수행 → 4) 검토 요청. 심사 상태와 안내는 AdSense에서 확인하세요.' },
+      { t: '거절 대처법', b: 'AdSense에 표시된 거절 사유부터 확인하세요. 원문 근거, 독창적인 설명, 미완성 페이지와 탐색 오류를 수정한 뒤 재검토합니다. 글 길이나 개수만으로 삭제·재신청을 결정하지 않습니다.' },
     ],
   },
   { id: 2, label: '수익화 시작', color: '#f59e0b', qg: 80,
@@ -353,6 +353,26 @@ function PillButton({ selected, onClick, children, style }) {
 function fmt(n) { return (n || 0).toLocaleString('ko-KR'); }
 function fmtKRW(n) { return '₩' + fmt(n); }
 
+// 관리자 API 호출: Supabase 세션 토큰을 Authorization 헤더로 보낸다 (서버가 허용 목록 + role='admin' 확인)
+// body 가 없으면 GET, 있으면 POST
+async function adminFetch(path, body) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error('로그인 세션이 만료되었습니다. 다시 로그인하세요.');
+  if (body === undefined) {
+    return fetch(path, { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' });
+  }
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+}
+
+// AdminGate 가 서버(/api/admin/me)에서 받은 값.
+// livePublish=false 면 발행·ETF 는 테스트 실행만 된다 (서버 스위치 PUBLISH_DISPATCH_ENABLED — AdSense 심사 기간 잠금)
+const AdminContext = createContext({ livePublish: false });
+
 const CHART_TOOLTIP = {
   contentStyle: {
     background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12,
@@ -367,26 +387,58 @@ const CHART_TICK = { fill: '#94a3b8', fontSize: 11 };
 // ═══════════════════════════════════════════
 
 function AdminGate({ children }) {
-  const [authState, setAuthState] = useState('loading'); // loading | admin | redirect
+  const [authState, setAuthState] = useState('loading'); // loading | admin | denied | error
+  const [email, setEmail] = useState('');
+  const [problem, setProblem] = useState(null); // error 상태의 { message, guide }
+  const [livePublish, setLivePublish] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.user) {
-        window.location.href = '/login';
-        return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          window.location.href = '/login';
+          return;
+        }
+        if (!cancelled) setEmail(session.user.email || '');
+        // 관리자 판정은 서버가 한다 (service key + ADMIN_USER_IDS + role).
+        // 브라우저에서 user_profiles 를 읽지 않으므로 RLS 상태(005 전 정책 무한 재귀 등)와 무관하다
+        const resp = await adminFetch('/api/admin/me');
+        const data = await resp.json().catch(() => ({}));
+        if (cancelled) return;
+        if (resp.ok && data.admin) {
+          setLivePublish(!!data.live_publish);
+          setAuthState('admin');
+        } else if (resp.status === 401) {
+          // 만료된 세션을 지우고 로그인으로
+          await supabase.auth.signOut().catch(() => {});
+          window.location.href = '/login';
+        } else if (resp.status === 403) {
+          setAuthState('denied');
+        } else {
+          setProblem({ message: data.error || `관리자 확인 실패 (HTTP ${resp.status})`, guide: data.guide || null });
+          setAuthState('error');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setProblem({ message: '관리자 확인 요청 실패: ' + err.message, guide: '네트워크 상태를 확인하고 다시 시도하세요.' });
+        setAuthState('error');
       }
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-      if (profile?.role === 'admin') {
-        setAuthState('admin');
-      } else {
-        window.location.href = '/dashboard';
-      }
-    });
-  }, []);
+    })();
+    return () => { cancelled = true; };
+  }, [attempt]);
+
+  const switchAccount = async () => {
+    await supabase.auth.signOut().catch(() => {});
+    window.location.href = '/login';
+  };
+  const retry = () => {
+    setProblem(null);
+    setAuthState('loading');
+    setAttempt(a => a + 1);
+  };
 
   if (authState === 'loading') {
     return (
@@ -396,8 +448,50 @@ function AdminGate({ children }) {
     );
   }
 
-  if (authState !== 'admin') return null;
-  return children;
+  // 관리자 전용 대시보드. 소비자 화면은 삭제되었으므로 다른 곳으로 보내지 않고 계정 전환만 안내한다
+  if (authState === 'denied') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FAFBFC', padding: 24 }}>
+        <Card style={{ maxWidth: 400, width: '100%', textAlign: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>관리자 권한이 없는 계정입니다</div>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px', lineHeight: 1.6 }}>
+            {email ? `${email} 계정은 ` : ''}이 대시보드를 열 수 없습니다. 관리자 계정으로 다시 로그인하세요.
+          </p>
+          <button onClick={switchAccount} style={{
+            padding: '10px 24px', borderRadius: 10, border: 'none', background: '#6366f1',
+            color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer'
+          }}>다른 계정으로 로그인</button>
+        </Card>
+      </div>
+    );
+  }
+
+  // 권한이 없는 것과 확인하지 못한 것은 다르다: 서버 설정·네트워크 문제는 원인과 다시 시도를 보여 준다
+  if (authState === 'error') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FAFBFC', padding: 24 }}>
+        <Card style={{ maxWidth: 440, width: '100%' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>관리자 확인을 끝내지 못했습니다</div>
+          <p style={{ fontSize: 13, color: '#dc2626', margin: '0 0 8px', lineHeight: 1.6 }}>{problem?.message}</p>
+          {problem?.guide && (
+            <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 20px', lineHeight: 1.6 }}>{problem.guide}</p>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: problem?.guide ? 0 : 12 }}>
+            <button onClick={retry} style={{
+              padding: '10px 24px', borderRadius: 10, border: 'none', background: '#6366f1',
+              color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer'
+            }}>다시 시도</button>
+            <button onClick={switchAccount} style={{
+              padding: '10px 20px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff',
+              color: '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+            }}>다른 계정으로 로그인</button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return <AdminContext.Provider value={{ livePublish }}>{children}</AdminContext.Provider>;
 }
 
 export default function Dashboard() {
@@ -462,9 +556,8 @@ export default function Dashboard() {
   const [adChecks, setAdChecks] = useState({});
   const toggleAd = id => setAdChecks(p => ({ ...p, [id]: !p[id] }));
 
-  // Monetization Stage
+  // Monetization Stage (읽기 전용 표시. 단계 전환은 대시보드에서 하지 않는다)
   const [monStage, setMonStage] = useState(1);
-  const [stageConfirmed, setStageConfirmed] = useState({ adsense_approved: false, coupang_api_approved: false });
   const [coupangProducts, setCoupangProducts] = useState([]);
   const [coupangSales, setCoupangSales] = useState(0);
   const [tenpingCampaigns, setTenpingCampaigns] = useState([]);
@@ -493,7 +586,6 @@ export default function Dashboard() {
       if (savedConfig.affKeys) setAffKeys(savedConfig.affKeys);
       if (savedConfig.adChecks) setAdChecks(savedConfig.adChecks);
       if (savedConfig.monetization_stage) setMonStage(savedConfig.monetization_stage);
-      if (savedConfig.stage_confirmed) setStageConfirmed(savedConfig.stage_confirmed);
       if (savedConfig.coupang_manual_products) setCoupangProducts(savedConfig.coupang_manual_products);
       if (savedConfig.coupang_sales_krw !== undefined) setCoupangSales(savedConfig.coupang_sales_krw);
       if (savedConfig.tenping_campaigns) setTenpingCampaigns(savedConfig.tenping_campaigns);
@@ -512,7 +604,6 @@ export default function Dashboard() {
       saveConfig({
         selNiches, tz, preset, selDays, selTimes, postsPerRun,
         affKeys, adChecks, lang, autoMode, snsOn, saas,
-        monetization_stage: monStage, stage_confirmed: stageConfirmed,
         coupang_manual_products: coupangProducts, coupang_sales_krw: coupangSales,
         tenping_campaigns: tenpingCampaigns,
       });
@@ -529,7 +620,7 @@ export default function Dashboard() {
     apiKeys, setApi, snsOn, toggleSns, adChecks, toggleAd,
     lang, setLang, autoMode, setAutoMode,
     adPct, connectedAff, connectedApi, snsCount, sites, savedConfig,
-    monStage, setMonStage, stageConfirmed, setStageConfirmed,
+    monStage,
     coupangProducts, setCoupangProducts, coupangSales, setCoupangSales,
     tenpingCampaigns, setTenpingCampaigns, totalPublished,
   };
@@ -590,29 +681,6 @@ export default function Dashboard() {
                 <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>Realtime</span>
               </div>
             </div>
-          </div>
-
-          {/* Stage Progress Bar */}
-          <div style={{ display: 'flex', gap: 4, margin: '0 0 8px' }}>
-            {STAGES.map(s => {
-              const active = monStage >= s.id;
-              const current = monStage === s.id;
-              return (
-                <div key={s.id} onClick={() => current && setTab('strategy')} style={{
-                  flex: 1, padding: '6px 12px', borderRadius: 8, cursor: current ? 'pointer' : 'default',
-                  background: current ? `${s.color}15` : active ? 'rgba(16,185,129,0.06)' : '#f1f5f9',
-                  border: current ? `2px solid ${s.color}` : '1px solid #e2e8f0',
-                  opacity: active ? 1 : 0.45, transition: 'all 0.2s',
-                }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: active ? s.color : '#94a3b8', letterSpacing: 1 }}>
-                    {active ? `STAGE ${s.id}` : `STAGE ${s.id}`}{!active && ' \u{1F512}'}
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: active ? '#1e293b' : '#cbd5e1', marginTop: 1 }}>
-                    {s.label}
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
           {/* Tabs */}
@@ -823,45 +891,44 @@ function DashTab({ siteId, selNiches, connectedAff, connectedApi, adPct, selDays
 // ═══════════════════════════════════════════
 
 function NicheTab({ selNiches, toggleNiche, siteId }) {
+  const { livePublish } = useContext(AdminContext);
   const [count, setCount] = useState(1);
-  const [dryRun, setDryRun] = useState(false);
+  const [dryRun, setDryRun] = useState(true);
   const [pubStatus, setPubStatus] = useState('idle');
   const [pubMsg, setPubMsg] = useState('');
   const [pubLogUrl, setPubLogUrl] = useState('');
   const [nicheEditing, setNicheEditing] = useState(selNiches.length === 0);
   const { posts, loading: postsLoading } = useRecentPosts(siteId, 5);
+  // 서버 스위치가 꺼져 있으면(AdSense 심사 기간) 테스트 실행만 가능
+  const isDry = !livePublish || dryRun;
 
   const handlePublish = async () => {
+    // publish.yml 은 사이트를 고르지 않는다: 헤더에서 고른 사이트와 관계없이 planx·bomissu job 이 함께 돈다
+    if (!isDry && !confirm(
+      `실제 발행합니다.\n\nplanx·bomissu 두 사이트 job이 함께 실행되어 사이트마다 최대 ${count}편이 WordPress에 올라갑니다.\n(헤더에서 고른 사이트와 관계없음 · 일시정지된 사이트는 엔진이 건너뜀)\n\n계속할까요?`
+    )) return;
     setPubStatus('loading');
     setPubMsg('');
+    setPubLogUrl('');
     try {
       const nicheParam = selNiches.length === 1 ? selNiches[0] : '';
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      const resp = await fetch('/api/setup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          action: 'publish',
-          siteId: siteId || '',
-          inputs: { count: String(count), pipeline: 'autoblog', dry_run: dryRun ? 'true' : 'false', niche: nicheParam },
-        }),
+      const resp = await adminFetch('/api/setup', {
+        action: 'publish',
+        siteId: siteId || '',
+        inputs: { count: String(count), pipeline: 'autoblog', dry_run: isDry ? 'true' : 'false', niche: nicheParam },
       });
       const data = await resp.json();
       if (resp.ok) {
         setPubStatus('success');
-        setPubMsg(`${dryRun ? '[테스트] ' : ''}발행 요청 완료! GitHub Actions에서 ${count}편 처리 중...`);
-        setPubLogUrl(`https://github.com/${process.env.NEXT_PUBLIC_GITHUB_REPO || 'planxs-ai/wp-auto'}/actions/workflows/publish.yml`);
+        setPubMsg(`${isDry ? '[테스트] ' : ''}실행 요청 완료. GitHub Actions에서 planx·bomissu job이 함께 돌며, 일시정지되지 않은 사이트마다 최대 ${count}편을 처리합니다.`);
+        setPubLogUrl(`https://github.com/${data.repo || 'planxs-ai/wp-auto'}/actions/workflows/publish.yml`);
       } else {
         setPubStatus('error');
-        setPubMsg(data.error || data.guide || '요청 실패');
+        setPubMsg([data.error || '요청 실패', data.guide].filter(Boolean).join(' — '));
       }
     } catch (err) {
       setPubStatus('error');
-      setPubMsg('네트워크 오류: ' + err.message);
+      setPubMsg('요청 실패: ' + err.message);
     }
   };
   return (
@@ -981,9 +1048,9 @@ function NicheTab({ selNiches, toggleNiche, siteId }) {
         <SectionTitle>발행</SectionTitle>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: 500 }}>발행 편수</div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: 500 }}>사이트당 편수 (최대 3편 — 검수 주 10~20편 기준)</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {[1, 3, 5, 10].map(n => (
+              {[1, 2, 3].map(n => (
                 <button key={n} onClick={() => setCount(n)} style={{
                   padding: '10px 20px', borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700,
                   border: count === n ? '2px solid #6366f1' : '2px solid #e2e8f0',
@@ -1001,25 +1068,32 @@ function NicheTab({ selNiches, toggleNiche, siteId }) {
           }}>
             <div>
               <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>테스트 모드</span>
-              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>실제 발행 없이 엔진만 실행</span>
+              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>
+                {livePublish ? '실제 발행 없이 엔진만 실행' : '실제 발행 잠김 — AdSense 심사 기간 (서버 스위치 꺼짐)'}
+              </span>
             </div>
-            <button onClick={() => setDryRun(!dryRun)} style={{
+            <button onClick={() => { if (livePublish) setDryRun(!dryRun); }} disabled={!livePublish} style={{
               width: 48, height: 26, borderRadius: 13, border: 'none',
-              background: dryRun ? '#6366f1' : '#e2e8f0',
-              cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
+              background: isDry ? '#6366f1' : '#e2e8f0',
+              cursor: livePublish ? 'pointer' : 'not-allowed', opacity: livePublish ? 1 : 0.5,
+              position: 'relative', transition: 'background 0.2s',
             }}>
               <div style={{
                 width: 20, height: 20, borderRadius: '50%', background: '#fff',
-                position: 'absolute', top: 3, left: dryRun ? 25 : 3,
+                position: 'absolute', top: 3, left: isDry ? 25 : 3,
                 transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
               }} />
             </button>
           </div>
 
+          <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
+            대상: planx·bomissu 두 사이트 모두. 헤더에서 고른 사이트와 관계없이 함께 실행됩니다(publish.yml에 사이트 선택이 아직 없음). 일시정지된 사이트는 엔진이 건너뜁니다.
+          </div>
+
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={handlePublish} disabled={pubStatus === 'loading' || selNiches.length === 0} style={{
               flex: 1, padding: '14px 24px', borderRadius: 12, border: 'none', cursor: pubStatus === 'loading' || selNiches.length === 0 ? 'not-allowed' : 'pointer',
-              background: selNiches.length === 0 ? '#e2e8f0' : dryRun ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #6366f1, #818cf8)',
+              background: selNiches.length === 0 ? '#e2e8f0' : isDry ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #6366f1, #818cf8)',
               color: selNiches.length === 0 ? '#94a3b8' : '#fff',
               fontSize: 15, fontWeight: 700, transition: 'opacity 0.15s',
               opacity: pubStatus === 'loading' ? 0.7 : 1,
@@ -1027,7 +1101,7 @@ function NicheTab({ selNiches, toggleNiche, siteId }) {
             }}>
               {selNiches.length === 0 ? '니치를 먼저 선택하세요'
                 : pubStatus === 'loading' ? '요청 전송 중...'
-                : dryRun ? `테스트 발행 (${count}편)` : `발행하기 (${count}편)`}
+                : isDry ? `테스트 실행 (사이트당 ${count}편)` : `실제 발행 (사이트당 ${count}편)`}
             </button>
           </div>
 
@@ -1080,10 +1154,10 @@ function NicheTab({ selNiches, toggleNiche, siteId }) {
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                   }}>{p.title}</div>
                   <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                    {p.keyword} · {new Date(p.published_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                    {p.keyword} · {new Date(p.published_at || p.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                   </div>
                 </div>
-                <Badge text={p.status === 'published' ? '발행' : '실패'} color={p.status === 'published' ? 'green' : 'red'} />
+                <Badge text={p.status === 'published' ? '발행' : p.status === 'draft' ? '검토 대기' : '실패'} color={p.status === 'published' ? 'green' : p.status === 'draft' ? 'yellow' : 'red'} />
               </div>
             ))}
           </div>
@@ -1456,7 +1530,8 @@ function ApiTab({ apiKeys, setApi, snsOn, toggleSns, savedConfig }) {
 // TAB 6: STRATEGY (Stage-Based Monetization)
 // ═══════════════════════════════════════════
 
-function StageTab({ monStage, setMonStage, stageConfirmed, setStageConfirmed,
+// 단계 전환(제휴 링크 켜기) UI 는 없다. 전환은 AdSense 승인 뒤 재개 게이트에서 사용자가 직접 결정한다
+function StageTab({ monStage,
   coupangProducts, setCoupangProducts, coupangSales, setCoupangSales,
   tenpingCampaigns, setTenpingCampaigns, totalPublished, adChecks, toggleAd, adPct }) {
 
@@ -1471,9 +1546,6 @@ function StageTab({ monStage, setMonStage, stageConfirmed, setStageConfirmed,
 
   const cur = STAGES[monStage - 1];
   const essentialOk = ['about', 'privacy', 'contact', 'nav'].every(k => adChecks[k]);
-  const can12 = totalPublished >= 20 && essentialOk && stageConfirmed.adsense_approved;
-  const can23 = totalPublished >= 50 && coupangSales >= 150000 && stageConfirmed.coupang_api_approved;
-  const canAdvance = monStage === 1 ? can12 : monStage === 2 ? can23 : false;
 
   const addCoupang = () => {
     if (!cpName || !cpUrl) return;
@@ -1634,44 +1706,15 @@ function StageTab({ monStage, setMonStage, stageConfirmed, setStageConfirmed,
         </Card>
       )}
 
-      {/* Stage Transition */}
-      {monStage < 3 && (
+      {/* 심사 요청 전 자체 점검 (읽기 전용 — 단계 전환 버튼 없음) */}
+      {monStage === 1 && (
         <Card>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', marginBottom: 12 }}>
-            Stage {monStage} &rarr; Stage {monStage + 1} 해금 조건
-          </div>
-          {monStage === 1 ? (
-            <>
-              <StageCondition ok={totalPublished >= 20} label={`글 20편 이상 (현재: ${totalPublished}편)`} />
-              <StageCondition ok={essentialOk} label="필수 페이지 완료 (About, Privacy, Contact, 메뉴)" />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
-                <button onClick={() => setStageConfirmed(p => ({ ...p, adsense_approved: !p.adsense_approved }))} style={{
-                  width: 20, height: 20, borderRadius: 5, border: 'none', cursor: 'pointer',
-                  background: stageConfirmed.adsense_approved ? '#10b981' : '#e2e8f0', color: '#fff', fontSize: 11,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{stageConfirmed.adsense_approved ? '\u2713' : ''}</button>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#1a1a2e' }}>AdSense 승인 완료 확인</span>
-              </div>
-            </>
-          ) : (
-            <>
-              <StageCondition ok={totalPublished >= 50} label={`글 50편 이상 (현재: ${totalPublished}편)`} />
-              <StageCondition ok={coupangSales >= 150000} label={`쿠팡 매출 15만원 달성 (현재: ${(coupangSales/10000).toFixed(1)}만원)`} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0' }}>
-                <button onClick={() => setStageConfirmed(p => ({ ...p, coupang_api_approved: !p.coupang_api_approved }))} style={{
-                  width: 20, height: 20, borderRadius: 5, border: 'none', cursor: 'pointer',
-                  background: stageConfirmed.coupang_api_approved ? '#10b981' : '#e2e8f0', color: '#fff', fontSize: 11,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{stageConfirmed.coupang_api_approved ? '\u2713' : ''}</button>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#1a1a2e' }}>쿠팡 API 승인 완료 확인</span>
-              </div>
-            </>
-          )}
-          <button onClick={() => { if (canAdvance && confirm(`Stage ${monStage + 1}로 전환하시겠습니까? 엔진 설정이 자동으로 변경됩니다.`)) setMonStage(monStage + 1); }}
-            disabled={!canAdvance} style={{
-              marginTop: 12, width: '100%', padding: '12px 0', borderRadius: 10, border: 'none', cursor: canAdvance ? 'pointer' : 'not-allowed',
-              background: canAdvance ? STAGES[monStage].color : '#e2e8f0', color: canAdvance ? '#fff' : '#94a3b8',
-              fontSize: 14, fontWeight: 700, transition: 'all 0.2s' }}>
-            {canAdvance ? `Stage ${monStage + 1}: ${STAGES[monStage].label}로 전환` : '조건 미충족'}
-          </button>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', marginBottom: 12 }}>심사 요청 전 자체 점검</div>
+          <StageCondition ok={totalPublished >= 20} label={`자체 검토 목표 20편 (Google 승인 기준 아님 · 현재: ${totalPublished}편)`} />
+          <StageCondition ok={essentialOk} label="사이트 정보·개인정보처리방침·문의·메뉴 직접 확인" />
+          <p style={{ fontSize: 11, color: '#94a3b8', margin: '10px 0 0', lineHeight: 1.6 }}>
+            수익화 단계 전환(제휴 링크 켜기)은 이 대시보드에서 하지 않습니다. AdSense 승인 뒤 재개 게이트에서 직접 결정합니다.
+          </p>
         </Card>
       )}
 
@@ -1692,21 +1735,6 @@ function StageTab({ monStage, setMonStage, stageConfirmed, setStageConfirmed,
           </div>
         ))}
       </Card>
-
-      {/* Next Stage Preview */}
-      {monStage < 3 && (
-        <div style={{ padding: 16, borderRadius: 12, border: '1px dashed #cbd5e1', background: '#fafbfc', opacity: 0.7 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>
-            다음 단계 미리보기: Stage {monStage + 1} — {STAGES[monStage].label}
-          </div>
-          <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{STAGES[monStage].desc}</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-            {STAGES[monStage].features.map((f, i) => (
-              <span key={i} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 12, background: '#f1f5f9', color: '#94a3b8' }}>{f}</span>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -2168,35 +2196,35 @@ function SettingsTab({ siteId, sites }) {
 // ═══════════════════════════════════════════
 
 function AdminTab({ autoMode, setAutoMode, selNiches, connectedAff, connectedApi }) {
+  const { livePublish } = useContext(AdminContext);
   const [reportType, setReportType] = useState('blog-ready');
-  const [etfDryRun, setEtfDryRun] = useState(false);
+  const [etfDryRun, setEtfDryRun] = useState(true);
   const [etfForce, setEtfForce] = useState(false);
   const [etfStatus, setEtfStatus] = useState('idle'); // idle | loading | success | error
   const [etfMsg, setEtfMsg] = useState('');
   const [etfLogUrl, setEtfLogUrl] = useState('');
+  // 서버 스위치가 꺼져 있으면(AdSense 심사 기간) 테스트 실행만 가능. ETF 는 planx(site-1)에 바로 공개된다
+  const etfIsDry = !livePublish || etfDryRun;
 
   const handleEtfReport = async () => {
+    if (!etfIsDry && !confirm('3days 리포트를 planx-ai.com에 실제 발행합니다.\n(ETF 파이프라인은 사이트 일시정지 상태를 확인하지 않습니다)\n\n계속할까요?')) return;
     setEtfStatus('loading');
     setEtfMsg('');
     setEtfLogUrl('');
     try {
-      const resp = await fetch('/api/etf-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ report_type: reportType, dry_run: etfDryRun, force: etfForce }),
-      });
+      const resp = await adminFetch('/api/etf-report', { report_type: reportType, dry_run: etfIsDry, force: etfForce });
       const data = await resp.json();
       if (resp.ok) {
         setEtfStatus('success');
-        setEtfMsg(`${etfDryRun ? '[테스트] ' : ''}3days 리포트 발행 요청 완료! GitHub Actions 처리 중...`);
+        setEtfMsg(`${etfIsDry ? '[테스트] ' : ''}3days 리포트 실행 요청 완료. GitHub Actions 처리 중...`);
         setEtfLogUrl(`https://github.com/${data.repo || 'mymiryu-commits/wp-auto'}/actions/workflows/etf-report.yml`);
       } else {
         setEtfStatus('error');
-        setEtfMsg(data.error || '요청 실패');
+        setEtfMsg([data.error || '요청 실패', data.guide].filter(Boolean).join(' — '));
       }
     } catch (err) {
       setEtfStatus('error');
-      setEtfMsg('네트워크 오류: ' + err.message);
+      setEtfMsg('요청 실패: ' + err.message);
     }
   };
 
@@ -2245,7 +2273,7 @@ function AdminTab({ autoMode, setAutoMode, selNiches, connectedAff, connectedApi
           📊 3days 전략리포트 — 관리자 전용
         </div>
         <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>
-          매일 KST 16:30 자동 발행 · 수동 즉시 발행 가능 (장 마감 후 권장)
+          planxs-ai/wp-auto의 예약 실행(평일 KST 16:30)은 편집 정비 기간 동안 정지됨 · 수동 실행은 장 마감 후 권장
         </div>
 
         {/* 리포트 유형 선택 */}
@@ -2269,7 +2297,11 @@ function AdminTab({ autoMode, setAutoMode, selNiches, connectedAff, connectedApi
         {/* 옵션 토글 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
           {[
-            { label: '테스트 모드', desc: '실제 발행 없이 엔진만 실행', val: etfDryRun, set: setEtfDryRun },
+            {
+              label: '테스트 모드',
+              desc: livePublish ? '실제 발행 없이 엔진만 실행' : '실제 발행 잠김 — AdSense 심사 기간 (서버 스위치 꺼짐)',
+              val: etfIsDry, set: setEtfDryRun, locked: !livePublish,
+            },
             { label: '강제 발행', desc: '주말/공휴일 무시하고 발행', val: etfForce, set: setEtfForce },
           ].map((opt, i) => (
             <div key={i} style={{
@@ -2280,9 +2312,10 @@ function AdminTab({ autoMode, setAutoMode, selNiches, connectedAff, connectedApi
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e' }}>{opt.label}</span>
                 <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 8 }}>{opt.desc}</span>
               </div>
-              <button onClick={() => opt.set(!opt.val)} style={{
+              <button onClick={() => { if (!opt.locked) opt.set(!opt.val); }} disabled={!!opt.locked} style={{
                 width: 44, height: 24, borderRadius: 12, border: 'none',
-                background: opt.val ? '#6366f1' : '#e2e8f0', cursor: 'pointer',
+                background: opt.val ? '#6366f1' : '#e2e8f0',
+                cursor: opt.locked ? 'not-allowed' : 'pointer', opacity: opt.locked ? 0.5 : 1,
                 position: 'relative', transition: 'background 0.2s',
               }}>
                 <div style={{
@@ -2299,7 +2332,7 @@ function AdminTab({ autoMode, setAutoMode, selNiches, connectedAff, connectedApi
         <button onClick={handleEtfReport} disabled={etfStatus === 'loading'} style={{
           width: '100%', padding: '13px 24px', borderRadius: 12, border: 'none',
           cursor: etfStatus === 'loading' ? 'not-allowed' : 'pointer',
-          background: etfDryRun
+          background: etfIsDry
             ? 'linear-gradient(135deg, #f59e0b, #d97706)'
             : 'linear-gradient(135deg, #6366f1, #818cf8)',
           color: '#fff', fontSize: 15, fontWeight: 700,
@@ -2308,8 +2341,8 @@ function AdminTab({ autoMode, setAutoMode, selNiches, connectedAff, connectedApi
           transition: 'opacity 0.15s',
         }}>
           {etfStatus === 'loading' ? '요청 전송 중...'
-            : etfDryRun ? `[테스트] 3days 리포트 실행`
-            : `📊 3days 리포트 즉시 발행`}
+            : etfIsDry ? `[테스트] 3days 리포트 실행`
+            : `📊 3days 리포트 실제 발행 (planx)`}
         </button>
 
         {/* 결과 메시지 */}
@@ -2371,7 +2404,7 @@ function PostsTab({ siteId }) {
               {posts.map(p => (
                 <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '12px 8px', whiteSpace: 'nowrap', color: '#94a3b8', fontSize: 12 }}>
-                    {new Date(p.published_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {new Date(p.published_at || p.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td style={{ padding: '12px 8px', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a2e' }}>
                     {p.url ? (

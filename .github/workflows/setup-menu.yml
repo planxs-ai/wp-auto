@@ -1,28 +1,37 @@
 name: Setup WP Menu
+# 관리자 대시보드(/api/setup) 또는 Actions 화면에서 수동 실행.
+# WP 자격증명은 input 으로 받지 않는다(이벤트 payload·로그에 남음). GitHub secrets 에서만 읽는다.
 on:
   workflow_dispatch:
     inputs:
-      wp_url:
-        description: 'WordPress URL (from dashboard)'
-        required: false
-      wp_username:
-        description: 'WP username (from dashboard)'
-        required: false
-      wp_app_password:
-        description: 'WP app password (from dashboard)'
-        required: false
       site_id:
-        description: 'Site ID'
-        required: false
+        description: '대상 사이트 (site-1=planx-ai.com, site-1775046458524=bomissu.com)'
+        type: choice
+        required: true
+        default: 'site-1'
+        options:
+          - 'site-1'
+          - 'site-1775046458524'
+
+permissions:
+  contents: read
 
 jobs:
   setup:
     runs-on: ubuntu-latest
     env:
-      WP_URL: ${{ inputs.wp_url || secrets.WP_URL }}
-      WP_USERNAME: ${{ inputs.wp_username || secrets.WP_USERNAME }}
-      WP_APP_PASSWORD: ${{ inputs.wp_app_password || secrets.WP_APP_PASSWORD }}
+      SITE_ID: ${{ inputs.site_id }}
+      # 사이트별 secrets. 대상 사이트 secret 이 비어 있으면 다른 사이트 값으로 넘어가지 않고 빈 값이 된다.
+      WP_URL: ${{ inputs.site_id == 'site-1' && secrets.WP_URL || inputs.site_id == 'site-1775046458524' && secrets.BOMISSU_WP_URL || '' }}
+      WP_USERNAME: ${{ inputs.site_id == 'site-1' && secrets.WP_USERNAME || inputs.site_id == 'site-1775046458524' && secrets.BOMISSU_WP_USERNAME || '' }}
+      WP_APP_PASSWORD: ${{ inputs.site_id == 'site-1' && secrets.WP_APP_PASSWORD || inputs.site_id == 'site-1775046458524' && secrets.BOMISSU_WP_APP_PASSWORD || '' }}
     steps:
+      - name: 자격증명 점검
+        run: |
+          if [ -z "$WP_URL" ] || [ -z "$WP_USERNAME" ] || [ -z "$WP_APP_PASSWORD" ]; then
+            echo "::error::$SITE_ID 의 WP secrets 가 비어 있습니다 (site-1: WP_URL·WP_USERNAME·WP_APP_PASSWORD, bomissu: BOMISSU_ 접두사)."
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:

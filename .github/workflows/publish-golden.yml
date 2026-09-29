@@ -20,22 +20,35 @@ on:
         required: false
         default: ''
       site_id:
-        description: 'Site ID (빈값=전체 관리 사이트)'
+        # 자유 입력을 받지 않는다: 선택지 밖 값은 GitHub이 dispatch 단계에서 거부한다.
+        description: '대상 사이트 (all=두 사이트 모두)'
+        type: choice
         required: false
-        default: ''
+        default: 'all'
+        options:
+          - all
+          - site-1
+          - site-1775046458524
+
+# 편집자가 WordPress에서 확인 후 공개. 수동 실행도 초안만 저장합니다.
+env:
+  EDITORIAL_REVIEW_REQUIRED: "true"
 
 permissions:
   contents: write
 
 jobs:
   golden-publish:
+    # 원본 저장소에서만 실행. upstream을 동기화한 fork에서 수동 실행해도 사용자 두 사이트를 건드리지 않는다.
+    if: github.repository == 'planxs-ai/wp-auto'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     strategy:
       fail-fast: false
       matrix:
-        site: ${{ inputs.site_id != '' && fromJson(format('["{0}"]', inputs.site_id)) || fromJson('["site-1","site-2","site-3"]') }}
+        # 사용자 소유 두 사이트만 (site_id는 선택지 입력, main.py는 그 외 site-id·WP 호스트면 exit 1)
+        site: ${{ (inputs.site_id == 'site-1' || inputs.site_id == 'site-1775046458524') && fromJson(format('["{0}"]', inputs.site_id)) || fromJson('["site-1","site-1775046458524"]') }}
 
     env:
       WP_URL: ${{ secrets.WP_URL }}
@@ -74,36 +87,32 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Golden AutoBlog (${{ matrix.site }})
+      - name: Run Golden AutoBlog (${{ matrix.site }}, drafts)
+        env:
+          # 수동 실행 전용. 입력값은 스크립트에 직접 끼워 넣지 않고 환경변수로 넘긴다(따옴표·공백 안전).
+          IN_SITE: ${{ matrix.site }}
+          IN_COUNT: ${{ inputs.count || '2' }}
+          IN_DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          IN_NICHE: ${{ inputs.niche || '' }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            COUNT="${{ github.event.inputs.count || '2' }}"
-            DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-            NICHE="${{ github.event.inputs.niche || '' }}"
-          else
-            COUNT="2"
-            DRY_RUN="false"
-            NICHE=""
-          fi
-
-          ARGS="--site-id ${{ matrix.site }} --count $COUNT --pipeline autoblog --golden"
-          if [ "$DRY_RUN" = "true" ]; then
-            ARGS="$ARGS --dry-run"
-          fi
-          if [ -n "$NICHE" ]; then
-            ARGS="$ARGS --niche $NICHE"
-          fi
-
-          python scripts/main.py $ARGS
+          args=(--site-id "$IN_SITE" --count "$IN_COUNT" --pipeline autoblog --golden)
+          if [ "$IN_DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          if [ -n "$IN_NICHE" ]; then args+=(--niche "$IN_NICHE"); fi
+          echo "▶ python scripts/main.py ${args[*]}"
+          python scripts/main.py "${args[@]}"
 
       # ETF 리포트는 etf-report.yml (KST 16:30)에서 단독 실행
 
       - name: Commit used keywords
         if: always()
+        env:
+          # matrix 값도 셸에 직접 끼워 넣지 않는다.
+          IN_SITE: ${{ matrix.site }}
         run: |
           git config user.email "bot@autoblog.com"
           git config user.name "AutoBlog Bot"
           git pull --rebase || true
           git add data/used_keywords.json || true
-          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d) [golden/${{ matrix.site }}]"
+          git add data/quarantined_keywords.json || true
+          git diff --staged --quiet || git commit -m "chore: update used keywords $(date +%Y-%m-%d) [golden/${IN_SITE}]"
           git push || true
