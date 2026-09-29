@@ -282,6 +282,15 @@ class _Args:
     mode = "hourly"
 
 
+def _freeze_clock(monkeypatch):
+    """run 과 store 가 같은 시각을 본다. 한쪽만 고정하면 dedupe 창이 어긋나
+    테스트가 '작성한 날에만' 통과한다(2026-09-29 실패로 드러났다)."""
+    import deals.core as C
+    import deals.run as R
+    monkeypatch.setattr(R, "now_kst", lambda: NOW)
+    monkeypatch.setattr(C, "now_kst", lambda: NOW)
+
+
 def _run_publish(monkeypatch, ms, cfg, sent):
     import deals.run as R
 
@@ -304,7 +313,7 @@ def _run_publish(monkeypatch, ms, cfg, sent):
     monkeypatch.setattr(R, "TelegramPublisher", FakeTG)
     monkeypatch.setattr(R, "WordPressPublisher", FakeWP)
     monkeypatch.setattr(R, "build_client", lambda *a, **k: FakeClient())
-    monkeypatch.setattr(R, "now_kst", lambda: NOW)
+    _freeze_clock(monkeypatch)
     return R.cmd_publish(_Args(), cfg, ms)
 
 
@@ -361,7 +370,7 @@ def test_publish_never_leaves_run_stuck_in_running(monkeypatch, cfg):
     monkeypatch.setattr(R, "TelegramPublisher", Boom)
     monkeypatch.setattr(R, "WordPressPublisher", Boom)
     monkeypatch.setattr(R, "build_client", lambda *a, **k: type("C", (), {"calls": 0, "errors": 0, "deeplinks": lambda s, u: {}})())
-    monkeypatch.setattr(R, "now_kst", lambda: NOW)
+    _freeze_clock(monkeypatch)
     R.cmd_publish(_Args(), cfg, ms)
     run = ms.rows("deal_runs")[0]
     assert run["status"] != "RUNNING" and run["finished_at"] and run["stats"]["errors"] >= 1
